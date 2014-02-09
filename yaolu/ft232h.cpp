@@ -15,10 +15,23 @@
 
 using namespace std;
 
+uint8_t lut[16] = {
+    0x0, 0x8, 0x4, 0xC,
+    0x2, 0xA, 0x6, 0xE,
+    0x1, 0x9, 0x5, 0xD,
+    0x3, 0xB, 0x7, 0xF };
+uint8_t FT232H::flip( uint8_t n )
+{
+   return (lut[n&0x0F] << 4) | lut[n>>4];
+}
+
 FT232H::FT232H()
   : SSn_led1(this, 2), CL_led2(this, 3), CS5368_reset(this, 0)
 {
-	CBUS_STATE = 0xF0;          // all pins are outputs, default low
+    CBUS_STATE = 0xF0;          // all pins are outputs, default low
+    head=entries=0;
+    for(uint32_t i = 0; i < BUFFER_SIZE; i++) dataBuffer[i] = 0;
+    for(uint32_t i = 0; i < BUFFER_SIZE; i++) RxBuffer[i] = 0;
 }
 
 void FT232H::open(uint16_t port){
@@ -29,21 +42,45 @@ void FT232H::open(uint16_t port){
 void FT232H::reset(){
     ftStatus = FT_SetBitMode(ftHandle, 0x00, FT_BITMODE_RESET);
     errCheck("Reset failed");
+    ftStatus = FT_SetTimeouts(ftHandle, 5000, 1000);
+    errCheck("FT_SetTimeouts");
 }
 
 void FT232H::purge(){
-	ftStatus = FT_Purge(ftHandle, FT_PURGE_RX | FT_PURGE_TX);
-	errCheck("FT_Purge failed");
+    ftStatus = FT_Purge(ftHandle, FT_PURGE_RX | FT_PURGE_TX);
+    errCheck("FT_Purge failed");
 }
 
 void FT232H::close(){
-	ftStatus = FT_Close(ftHandle);
+    ftStatus = FT_Close(ftHandle);
     errCheck("FT_Close failed");
+}
+
+void FT232H::read(){
+    ftStatus = FT_GetQueueStatus(ftHandle, &RxBytes);
+    errCheck("FT_GetQueueStatus failed");
+    if(RxBytes > 0){
+        ftStatus = FT_Read(ftHandle, RxBuffer, RxBytes, &BytesReceived);
+        errCheck("FT_Read failed");
+        if(RxBytes != BytesReceived){
+            cout << "Bytes read mis-match" << endl;
+            exit(0);
+        }
+    }
+    saveToBuffer(BytesReceived);
+}
+
+void FT232H::saveToBuffer(DWORD bytes){
+    for(DWORD i = 0; i < bytes; i++){
+        if(entries == BUFFER_SIZE) head++;
+        dataBuffer[(head+entries)%BUFFER_SIZE] = RxBuffer[i];
+        if(entries != BUFFER_SIZE) entries++;
+    }
 }
 
 void FT232H::programEEPROM()
 {
-	static FT_PROGRAM_DATA Data;			// static for initial zeros
+    static FT_PROGRAM_DATA Data;            // static for initial zeros
     char manufacturer[] = "FTDI";
     char manufacturerID[] = "FT";
     char description[] = "UM232H";
@@ -76,20 +113,20 @@ void FT232H::programEEPROM()
 //  Data.ACDriveCurrentH = 8;
 //  Data.ADDriveCurrentH = 8;
 
-	// Cbus mux settings
-	Data.Cbus4H = FT_232H_CBUS_TXRXLED;
+    // Cbus mux settings
+    Data.Cbus4H = FT_232H_CBUS_TXRXLED;
     Data.Cbus5H = FT_232H_CBUS_IOMODE;      // FT1248 SS_n
-    Data.Cbus6H = FT_232H_CBUS_IOMODE;		// flip flop clear
+    Data.Cbus6H = FT_232H_CBUS_IOMODE;      // flip flop clear
     Data.Cbus8H = FT_232H_CBUS_IOMODE;      // UM232H onboard led1
     Data.Cbus9H = FT_232H_CBUS_IOMODE;      // UM232H onboard led2
 
-	// FT1248 Settings
-    Data.IsFT1248H = 1;						// FT1248 enable
-    Data.FT1248CpolH = 1;					// clock idle high
-    Data.FT1248LsbH = 0;					// MSB first
-    Data.FT1248FlowControlH = 0;			// flow control disabled
+    // FT1248 Settings
+    Data.IsFT1248H = 1;                     // FT1248 enable
+    Data.FT1248CpolH = 1;                   // clock idle high
+    Data.FT1248LsbH = 0;                    // MSB first
+    Data.FT1248FlowControlH = 0;            // flow control disabled
 
-	Data.IsVCPH = 0;						// disable VCP drivers
+    Data.IsVCPH = 0;                        // disable VCP drivers
 
     ftStatus = FT_EE_Program(ftHandle, &Data);
     errCheck("programEE");
@@ -155,13 +192,13 @@ void FT232H::errCheck(string errString)
 }
 
 void ACBUS_out::operator=(uint8_t out){
-	value = out;
-	if(value == 0) ft->CBUS_STATE &= mask_low;
-	else		   ft->CBUS_STATE |= mask_high;
-	ft->ftStatus = FT_SetBitMode(ft->ftHandle, ft->CBUS_STATE,
-							 FT_BITMODE_CBUS_BITBANG);
+    value = out;
+    if(value == 0) ft->CBUS_STATE &= mask_low;
+    else           ft->CBUS_STATE |= mask_high;
+    ft->ftStatus = FT_SetBitMode(ft->ftHandle, ft->CBUS_STATE,
+                             FT_BITMODE_CBUS_BITBANG);
 }
 
 uint8_t ACBUS_out::operator!() const{
-	return !value;
+    return !value;
 }
