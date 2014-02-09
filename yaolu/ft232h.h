@@ -35,16 +35,11 @@ const uint32_t BUFFER_SIZE = 2048;
 class ACBUS_out {
   private:
     FT232H* ft;                 // associated device
-    uint8_t mask_high;
-    uint8_t mask_low;
-    uint8_t value;
+    uint8_t mask_high;          // used for driving high
+    uint8_t mask_low;           // used for driving low
+    uint8_t value;              // save current state
   public:
-    ACBUS_out(FT232H* ft, uint8_t index){
-        this->ft = ft;
-        mask_high = 1 << index;
-        mask_low = ~(1 << index);
-        value = 0;                      // initial output
-    }
+    ACBUS_out(FT232H* ft, uint8_t index);
     void operator=(uint8_t out);
     uint8_t operator!() const;
 };
@@ -55,7 +50,7 @@ class ACBUS_out {
  *
  */
 class FT232H {
-  friend class ACBUS_out;           // allow allow to status variables
+  friend class ACBUS_out;           // allow to status variables
 
   private:
     FT_STATUS ftStatus;             // stores status on each API call

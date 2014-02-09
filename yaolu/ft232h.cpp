@@ -15,6 +15,7 @@
 
 using namespace std;
 
+/* Table and function used to flip a byte */
 uint8_t lut[16] = {
     0x0, 0x8, 0x4, 0xC,
     0x2, 0xA, 0x6, 0xE,
@@ -25,9 +26,19 @@ uint8_t FT232H::flip( uint8_t n )
    return (lut[n&0x0F] << 4) | lut[n>>4];
 }
 
+/* Constructor, initializes ACBUS pins and initial variables */
 FT232H::FT232H()
   : SSn_led1(this, 2), CL_led2(this, 3), CS5368_reset(this, 0)
 {
+    /*
+     * Upper nibble of CBUS_STATE defines direction.
+     * Lower nibble defines the output with this mapping:
+     *      bit 3: ACBUS 9 (flip flop clear)
+     *      bit 2: ACBUS 8 (FT1248 slave select)
+     *      bit 1: ACBUS 6 (unused)
+     *      bit 0: ACBUS 5 (CS5368 reset)
+     *
+     */
     CBUS_STATE = 0xF0;          // all pins are outputs, default low
     head=entries=0;
     for(uint32_t i = 0; i < BUFFER_SIZE; i++) dataBuffer[i] = 0;
@@ -42,11 +53,15 @@ void FT232H::open(uint16_t port){
 void FT232H::reset(){
     ftStatus = FT_SetBitMode(ftHandle, 0x00, FT_BITMODE_RESET);
     errCheck("Reset failed");
+
+    // Sets a read timeout of 5 sec and write timeout of 1 sec
     ftStatus = FT_SetTimeouts(ftHandle, 5000, 1000);
     errCheck("FT_SetTimeouts");
 }
 
 void FT232H::purge(){
+
+    // Clear both receive and send buffers on FT232H
     ftStatus = FT_Purge(ftHandle, FT_PURGE_RX | FT_PURGE_TX);
     errCheck("FT_Purge failed");
 }
@@ -57,24 +72,35 @@ void FT232H::close(){
 }
 
 void FT232H::read(){
+
+    // Get the number bytes currently in FT232H's buffer
     ftStatus = FT_GetQueueStatus(ftHandle, &RxBytes);
     errCheck("FT_GetQueueStatus failed");
+
     if(RxBytes > 0){
+
+        // Read in the current amount. This function should not block
+        // because it is requests the number of bytes from FT_GetQueueStatus
         ftStatus = FT_Read(ftHandle, RxBuffer, RxBytes, &BytesReceived);
         errCheck("FT_Read failed");
+
         if(RxBytes != BytesReceived){
             cout << "Bytes read mis-match" << endl;
             exit(0);
         }
     }
+
+    // Add bytes to global buffer
     saveToBuffer(BytesReceived);
 }
 
 void FT232H::saveToBuffer(DWORD bytes){
+
+    // For each byte that needs to be added
     for(DWORD i = 0; i < bytes; i++){
-        if(entries == BUFFER_SIZE) head++;
+        if(entries == BUFFER_SIZE) head++;      // buffer is full, move up one
         dataBuffer[(head+entries)%BUFFER_SIZE] = RxBuffer[i];
-        if(entries != BUFFER_SIZE) entries++;
+        if(entries != BUFFER_SIZE) entries++;   // buffer not full, add to end
     }
 }
 
@@ -115,10 +141,10 @@ void FT232H::programEEPROM()
 
     // Cbus mux settings
     Data.Cbus4H = FT_232H_CBUS_TXRXLED;
-    Data.Cbus5H = FT_232H_CBUS_IOMODE;      // FT1248 SS_n
-    Data.Cbus6H = FT_232H_CBUS_IOMODE;      // flip flop clear
-    Data.Cbus8H = FT_232H_CBUS_IOMODE;      // UM232H onboard led1
-    Data.Cbus9H = FT_232H_CBUS_IOMODE;      // UM232H onboard led2
+    Data.Cbus5H = FT_232H_CBUS_IOMODE;      // CS5368 reset
+    Data.Cbus6H = FT_232H_CBUS_IOMODE;      // unused
+    Data.Cbus8H = FT_232H_CBUS_IOMODE;      // FT1248 SS_n / led1
+    Data.Cbus9H = FT_232H_CBUS_IOMODE;      // flip flop clear / led2
 
     // FT1248 Settings
     Data.IsFT1248H = 1;                     // FT1248 enable
@@ -191,10 +217,19 @@ void FT232H::errCheck(string errString)
     exit(0);
 }
 
+ACBUS_out::ACBUS_out(FT232H* ft, uint8_t index){
+    this->ft = ft;                  // save associated device
+    mask_high = 1 << index;         // set bit mask used for driving high
+    mask_low = ~(1 << index);       // set bit mask used for driving low
+    value = 0;                      // initial output
+}
+
 void ACBUS_out::operator=(uint8_t out){
-    value = out;
-    if(value == 0) ft->CBUS_STATE &= mask_low;
-    else           ft->CBUS_STATE |= mask_high;
+    value = out;                    // save current state
+    if(value == 0) ft->CBUS_STATE &= mask_low;      // drive low
+    else           ft->CBUS_STATE |= mask_high;     // else drive high
+
+    // Write out to device
     ft->ftStatus = FT_SetBitMode(ft->ftHandle, ft->CBUS_STATE,
                              FT_BITMODE_CBUS_BITBANG);
 }
