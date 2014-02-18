@@ -13,10 +13,11 @@
  */
 
 #include "ft232h.h"
+#include <unistd.h>
 
 using namespace std;
 
-int main(int argc, char* argv[])
+int main()
 {
     bool first_run = false;             // get this as a cmd arg later
 
@@ -57,17 +58,24 @@ int main(int argc, char* argv[])
 
     cout << "Clearing buffers on FT232H... ";
     ft.purge();                         // clear buffers
-    cout << "Cleared." << endl;
+    cout << "Cleared." << endl << endl;
 
+    // Read in 20,000 bytes of data and format into the channel
+    // buffer (which will overflow)
     cout << "Reading data from FT232H... ";
-    while(1){
-        ft.read();
-        if(ft.getEntries() >= 100) break;       
-    }
+        ft.blockingRead(300, 5000);
+//        ft.alignToNextLSR(2);
+//    for(int i = 0; i < 20; i++){
+//        ft.blockingRead(100, 5000);
+//        while(ft.formatSample()){}
+//    }
     cout << "Done." << endl;
+    
+    // Write contents of buffer out to files for easy graphing
+    //ft.writeBuf2File();
 
-    cout << "Buffer contains:" << endl;
-    ft.printBuffer(100);    
+    //cout << "Buffer contains:" << endl;
+    ft.printBuffer(300);    
 
     ft.close();
     return 0;

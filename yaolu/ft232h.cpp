@@ -15,7 +15,8 @@
 
 using namespace std;
 
-/* Table and function used to flip a byte */
+/* Table and function used to flip a byte, defined for convenient
+ * debugging purposes */
 uint8_t lut[16] = {
     0x0, 0x8, 0x4, 0xC,
     0x2, 0xA, 0x6, 0xE,
@@ -28,21 +29,25 @@ uint8_t FT232H::flip( uint8_t n )
 
 /* Constructor, initializes ACBUS pins and initial variables */
 FT232H::FT232H()
-  : SSn_led1(this, 2), CL_led2(this, 3), CS5368_reset(this, 0)
+  : SSn_led1(this, 2), CL_led2(this, 3), CLK7_5(this, 1), CS5368_reset(this, 0)
 {
     /*
      * Upper nibble of CBUS_STATE defines direction.
      * Lower nibble defines the output with this mapping:
      *      bit 3: ACBUS 9 (flip flop clear)
      *      bit 2: ACBUS 8 (FT1248 slave select)
-     *      bit 1: ACBUS 6 (unused)
+     *      bit 1: ACBUS 6 (7.5 Mhz clock)
      *      bit 0: ACBUS 5 (CS5368 reset)
      *
      */
     CBUS_STATE = 0xF0;          // all pins are outputs, default low
-    head=entries=0;
-    for(uint32_t i = 0; i < BUFFER_SIZE; i++) dataBuffer[i] = 0;
-    for(uint32_t i = 0; i < BUFFER_SIZE; i++) RxBuffer[i] = 0;
+
+    // Initialize buffers
+    for(uint32_t i = 0; i < 1024; i++) RxBuffer[i] = 0;
+    dataBuffer.setSize(RAW_BUFFER_SIZE);
+    for(uint32_t i = 0; i < 8; i ++){
+        channelBuffer[i].setSize(CHANNEL_BUFFER_SIZE);
+    }
 }
 
 void FT232H::open(uint16_t port){
@@ -90,17 +95,74 @@ void FT232H::read(){
         }
     }
 
-    // Add bytes to global buffer
-    saveToBuffer(BytesReceived);
+    dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
 }
 
-void FT232H::saveToBuffer(DWORD bytes){
+DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout){
+    ftStatus = FT_SetTimeouts(ftHandle, timeout, 1000);
+    errCheck("FT_SetTimeouts");
+    ftStatus = FT_Read(ftHandle, RxBuffer, bytes, &BytesReceived);
+    errCheck("FT_Read");
+    if(BytesReceived < bytes){
+        cout << "Timed out in blockingRead" << endl;
+    }
 
-    // For each byte that needs to be added
-    for(DWORD i = 0; i < bytes; i++){
-        if(entries == BUFFER_SIZE) head++;      // buffer is full, move up one
-        dataBuffer[(head+entries)%BUFFER_SIZE] = RxBuffer[i];
-        if(entries != BUFFER_SIZE) entries++;   // buffer not full, add to end
+for(DWORD i = 0; i < BytesReceived; i++){
+    RxBuffer[i] = flip(RxBuffer[i]);
+}
+
+    dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
+    return BytesReceived;
+}
+
+bool FT232H::formatSample(){
+    if(dataBuffer.getEntries() < 32) return false;
+
+    uint8_t entry;
+    // Peek into first entry for the LSR bit, which is high in LJ mode
+    // when the channel is even
+    dataBuffer.getN(&entry, 1);
+    uint8_t LSR = entry & 1;
+
+    // Add a new entry for the even or odd channels, depending on LSR
+    uint32_t i0 = channelBuffer[1-LSR].add(0);
+    uint32_t i1 = channelBuffer[3-LSR].add(0);
+    uint32_t i2 = channelBuffer[5-LSR].add(0);
+    uint32_t i3 = channelBuffer[7-LSR].add(0);
+
+    // For each of the next 24 bits, store the bit into the correct
+    // position of each channel sample buffer
+    for(int i = 0; i < 24; i++){
+        dataBuffer.pop(&entry);         // retrieve next and remove
+        if(LSR != (entry&1)) 
+        channelBuffer[1-LSR][i0] |= ((uint32_t) ((entry&2)>>1) << i);
+        channelBuffer[3-LSR][i1] |= ((uint32_t) ((entry&4)>>2) << i);
+        channelBuffer[5-LSR][i2] |= ((uint32_t) ((entry&8)>>3) << i);
+        channelBuffer[7-LSR][i3] |= ((uint32_t) ((entry&16)>>4) << i);
+    }
+
+    // Skip any extra bits for this set of channels
+    alignToNextLSR(LSR);
+
+    return true;
+}
+
+/* Aligns buffer to the next set of channels different from the given LSR.
+ * If no valid LSR (0 or 1) is given, the LSR of the first entry in the
+ * buffer is used */
+void FT232H::alignToNextLSR(uint8_t LSR){
+    uint8_t entry;
+    int i = 0;
+    dataBuffer.getN(&entry, 1);
+    if(LSR > 1) LSR = entry & 1;
+    while((entry&1) == LSR){
+        dataBuffer.pop(&entry);
+        dataBuffer.getN(&entry, 1);
+        i++;
+        if(i > 32){
+            cout << "Error: Over 32 clock cycles seen for one sample!" << endl;
+            exit(0);
+        }
     }
 }
 
@@ -122,7 +184,7 @@ void FT232H::programEEPROM()
     Data.Description = description;
     Data.SerialNumber = serialNumber;
 
-    Data.MaxPower = 90;
+    Data.MaxPower = 500;
     Data.PnP = 1;
     Data.SelfPowered = 0;
     Data.RemoteWakeup = 1;
@@ -142,7 +204,7 @@ void FT232H::programEEPROM()
     // Cbus mux settings
     Data.Cbus4H = FT_232H_CBUS_TXRXLED;
     Data.Cbus5H = FT_232H_CBUS_IOMODE;      // CS5368 reset
-    Data.Cbus6H = FT_232H_CBUS_IOMODE;      // unused
+    Data.Cbus6H = FT_232H_CBUS_CLK7_5;      // CLK 7.5Mhz
     Data.Cbus8H = FT_232H_CBUS_IOMODE;      // FT1248 SS_n / led1
     Data.Cbus9H = FT_232H_CBUS_IOMODE;      // flip flop clear / led2
 
@@ -228,7 +290,6 @@ void ACBUS_out::operator=(uint8_t out){
     value = out;                    // save current state
     if(value == 0) ft->CBUS_STATE &= mask_low;      // drive low
     else           ft->CBUS_STATE |= mask_high;     // else drive high
-
     // Write out to device
     ft->ftStatus = FT_SetBitMode(ft->ftHandle, ft->CBUS_STATE,
                              FT_BITMODE_CBUS_BITBANG);

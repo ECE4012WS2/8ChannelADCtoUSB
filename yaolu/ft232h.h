@@ -11,16 +11,26 @@
  *
  */
 
-#include <stdlib.h>
-#include <iostream>
-#include <string>
-#include <stdint.h>
-//#include <cstdint>
+/*** Standard library headers ***/
+#include <stdlib.h>             // for exit
+#include <iostream>             // std out
+#include <fstream>              // file stream
+#include <sstream>              // string stream
+#include <stdint.h>             // int types
+#include <bitset>
+
+/*** FTDI library header ****/
 #include "ftd2xx.h"
 
-class FT232H;
+/*** Other supporting headers ***/
+#include "buffer.h"             // managing buffer
 
-const uint32_t BUFFER_SIZE = 2048;
+
+/*** Global constants ***/
+const uint32_t RAW_BUFFER_SIZE = 2048;
+const uint32_t CHANNEL_BUFFER_SIZE = 200;
+
+class FT232H;                   // declare class existance
 
 /*
  * Helper class for convenient usage of output IO pins
@@ -57,16 +67,16 @@ class FT232H {
     FT_HANDLE ftHandle;             // FT232H device handle
     uint8_t CBUS_STATE;             // maintains current CBUS IO pin state
 
-    // Buffer and variables for each read
-    uint8_t RxBuffer[1024];
+    // Buffer and variables for storing results of each read
+    uint8_t RxBuffer[1024];         // buffer size on FT232H is 1k bytes
     DWORD RxBytes;
     DWORD BytesReceived;
 
-    // Global buffer containing recently received data and accomplaining
-    // variables to maintain it as a circular buffer
-    uint8_t dataBuffer[BUFFER_SIZE];
-    uint32_t head;
-    uint32_t entries;
+    // Buffer containing all recently read raw data
+    circularBuffer<uint8_t> dataBuffer;
+
+    // Buffers for formatted data for each channel
+    circularBuffer<uint32_t> channelBuffer[8];
 
   public:
 
@@ -76,6 +86,8 @@ class FT232H {
     ACBUS_out SSn_led1;
     // D flip-flop active low clear, also tied to led2 on UM232H (ACBUS9)
     ACBUS_out CL_led2;
+    // Clock, 7.5Mhz
+    ACBUS_out CLK7_5;
     // CS5368 active low reset (ACBUS5)
     ACBUS_out CS5368_reset;
     // Remaining IO pin, unused for now (ACBUS6)
@@ -96,17 +108,21 @@ class FT232H {
 
 /*** Functions managing receive buffer ***/
 
-    /* Reads in available data and adds it to the buffer */
+    /* Reads in available data and adds it to the dataBuffer */
     void read();
-    /* Get the current number of entries in buffer */
-    int getEntries(){ return entries; }
-    /* Clear buffer */
-    void clearBuffer(){ head=entries=0; }
+
+    /* Reads in the requested amount of data within the time frame,
+     * or else times out */
+    DWORD blockingRead(DWORD bytes, DWORD timeout);
+
+    /// NOT TESTED ///
+    /* Formats a single sample for 4 channels from the global raw data
+     * buffer and stores it into its respective buffer */
+    bool formatSample();
+
+    void alignToNextLSR(uint8_t LSR);
 
 /*** Supporting functions ***/
-
-    /* Adds received data into the buffer */
-    void saveToBuffer(DWORD bytes);
 
     /*
      * Called to program desired values into the EEPROM,
@@ -129,9 +145,41 @@ class FT232H {
 
     uint8_t flip( uint8_t n );
     void printBuffer(uint32_t count){
-        if(count > BUFFER_SIZE) count = BUFFER_SIZE;
+        for(int i = 0; i < 100; i++){
+            std::cout << "0b" << std::bitset<8>(dataBuffer[i]) << std::endl;
+        }
+        /*
         for(uint32_t i = 0; i < count; i++){
-            std::cout << std::hex << (unsigned int) flip(dataBuffer[i]) << std::endl;
+            std::cout << std::hex << "Channel 1: " << (unsigned int) channelBuffer[0][i] << std::endl;
+            std::cout << std::hex << "Channel 2: " << (unsigned int) channelBuffer[1][i] << std::endl;
+            std::cout << std::hex << "Channel 3: " << (unsigned int) channelBuffer[2][i] << std::endl;
+            std::cout << std::hex << "Channel 4: " << (unsigned int) channelBuffer[3][i] << std::endl;
+            std::cout << std::hex << "Channel 5: " << (unsigned int) channelBuffer[4][i] << std::endl;
+            std::cout << std::hex << "Channel 6: " << (unsigned int) channelBuffer[5][i] << std::endl;
+            std::cout << std::hex << "Channel 7: " << (unsigned int) channelBuffer[6][i] << std::endl;
+            std::cout << std::hex << "Channel 8: " << (unsigned int) channelBuffer[7][i] << std::endl;
+        }
+        */
+    }
+
+    /* Writes each of the channel buffers out to a separate
+     * file in csv format
+     */
+    void writeBuf2File(){
+        std::ofstream file;
+        uint32_t entry;
+        uint32_t n;
+        for(int i = 0; i < 8; i++){
+            std::stringstream filename;
+            filename << "channel" << (i+1) << ".csv";
+            file.open(filename.str().c_str());
+            channelBuffer[i].reset();
+            n = 0;
+            while(channelBuffer[i].getNext(entry)){
+                file << n << "," << entry << std::endl;
+                n++;
+            }
+            file.close();
         }
     }
 };
