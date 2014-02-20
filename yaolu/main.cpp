@@ -60,22 +60,24 @@ int main()
     ft.purge();                         // clear buffers
     cout << "Cleared." << endl << endl;
 
-    // Read in 20,000 bytes of data and format into the channel
+    // Read in 20,000 bytes of data
     // buffer (which will overflow)
     cout << "Reading data from FT232H... ";
-        ft.blockingRead(300, 5000);
-//        ft.alignToNextLSR(2);
-//    for(int i = 0; i < 20; i++){
-//        ft.blockingRead(100, 5000);
-//        while(ft.formatSample()){}
-//    }
+    for(int i = 0; i < 20; i++){
+        ft.blockingRead(1000, 5000);
+    }
     cout << "Done." << endl;
+
+    // Format 200 times (so there will be ~100 samples in each channel)
+    for(int i = 0; i < 200; i++){
+        ft.formatSample();
+    }
     
     // Write contents of buffer out to files for easy graphing
-    //ft.writeBuf2File();
+    ft.writeBuf2File();
 
     //cout << "Buffer contains:" << endl;
-    ft.printBuffer(300);    
+    //ft.printBuffer(2048);    
 
     ft.close();
     return 0;

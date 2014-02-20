@@ -105,63 +105,70 @@ DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout){
     errCheck("FT_Read");
     if(BytesReceived < bytes){
         cout << "Timed out in blockingRead" << endl;
+        exit(0);
     }
 
+/******************************************************************************************
+ * MSIO0 is MSB apparently, temporary flip in software, re-wire hardware in final design
+ ******************************************************************************************/
 for(DWORD i = 0; i < BytesReceived; i++){
     RxBuffer[i] = flip(RxBuffer[i]);
 }
+/******************************************************************************************/
 
     dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
     return BytesReceived;
 }
 
 bool FT232H::formatSample(){
-    if(dataBuffer.getEntries() < 32) return false;
+    if(dataBuffer.getEntries() < 100) return false;
 
     uint8_t entry;
-    // Peek into first entry for the LSR bit, which is high in LJ mode
+    // Peek into first entry for the LRCK bit, which is high in LJ mode
     // when the channel is even
     dataBuffer.getN(&entry, 1);
-    uint8_t LSR = entry & 1;
+    uint8_t LRCK = entry & 1;
 
-    // Add a new entry for the even or odd channels, depending on LSR
-    uint32_t i0 = channelBuffer[1-LSR].add(0);
-    uint32_t i1 = channelBuffer[3-LSR].add(0);
-    uint32_t i2 = channelBuffer[5-LSR].add(0);
-    uint32_t i3 = channelBuffer[7-LSR].add(0);
+    // Add a new entry for the even or odd channels, depending on LRCK 
+    uint32_t i0 = channelBuffer[1-LRCK].add(0);
+    uint32_t i1 = channelBuffer[3-LRCK].add(0);
+    uint32_t i2 = channelBuffer[5-LRCK].add(0);
+    uint32_t i3 = channelBuffer[7-LRCK].add(0);
 
     // For each of the next 24 bits, store the bit into the correct
     // position of each channel sample buffer
     for(int i = 0; i < 24; i++){
-        dataBuffer.pop(&entry);         // retrieve next and remove
-        if(LSR != (entry&1)) 
-        channelBuffer[1-LSR][i0] |= ((uint32_t) ((entry&2)>>1) << i);
-        channelBuffer[3-LSR][i1] |= ((uint32_t) ((entry&4)>>2) << i);
-        channelBuffer[5-LSR][i2] |= ((uint32_t) ((entry&8)>>3) << i);
-        channelBuffer[7-LSR][i3] |= ((uint32_t) ((entry&16)>>4) << i);
+        dataBuffer.getN(&entry, 1);                 // Get one entry
+        if(LRCK != (entry&1)) return true;
+        channelBuffer[1-LRCK][i0] |= ((uint32_t) ((entry&2)>>1) << (23-i));
+        channelBuffer[3-LRCK][i1] |= ((uint32_t) ((entry&4)>>2) << (23-i));
+        channelBuffer[5-LRCK][i2] |= ((uint32_t) ((entry&8)>>3) << (23-i));
+        channelBuffer[7-LRCK][i3] |= ((uint32_t) ((entry&16)>>4) << (23-i));
+        dataBuffer.clearN(1);                       // Remove one entry
     }
 
-    // Skip any extra bits for this set of channels
-    alignToNextLSR(LSR);
+    // Skip extra bits to the next LRCK
+    alignToNextLRCK(LRCK);
 
     return true;
 }
 
-/* Aligns buffer to the next set of channels different from the given LSR.
- * If no valid LSR (0 or 1) is given, the LSR of the first entry in the
+/* Aligns buffer to the next set of channels different from the given LRCK.
+ * If no valid LRCK (0 or 1) is given, the LRCK of the first entry in the
  * buffer is used */
-void FT232H::alignToNextLSR(uint8_t LSR){
+void FT232H::alignToNextLRCK(uint8_t LRCK){
     uint8_t entry;
     int i = 0;
     dataBuffer.getN(&entry, 1);
-    if(LSR > 1) LSR = entry & 1;
-    while((entry&1) == LSR){
-        dataBuffer.pop(&entry);
-        dataBuffer.getN(&entry, 1);
+    //if(LRCK > 1) LRCK = entry & 1;
+    while((entry&1) == LRCK){               // Check if LRCK is still the same
+        //dataBuffer.pop(&entry);
+        dataBuffer.clearN(1);               // Get rid of it
+        dataBuffer.getN(&entry, 1);         // Grab the next entry
         i++;
-        if(i > 32){
-            cout << "Error: Over 32 clock cycles seen for one sample!" << endl;
-            exit(0);
+        if(i > 8){
+            //cout << "Error: Over 32 clock cycles seen for one sample!" << endl;
+            //exit(0);
         }
     }
 }

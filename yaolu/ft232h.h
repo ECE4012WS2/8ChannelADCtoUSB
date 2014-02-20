@@ -27,7 +27,7 @@
 
 
 /*** Global constants ***/
-const uint32_t RAW_BUFFER_SIZE = 2048;
+const uint32_t RAW_BUFFER_SIZE = 12800;
 const uint32_t CHANNEL_BUFFER_SIZE = 200;
 
 class FT232H;                   // declare class existance
@@ -120,7 +120,7 @@ class FT232H {
      * buffer and stores it into its respective buffer */
     bool formatSample();
 
-    void alignToNextLSR(uint8_t LSR);
+    void alignToNextLRCK(uint8_t LRCK);
 
 /*** Supporting functions ***/
 
@@ -145,7 +145,7 @@ class FT232H {
 
     uint8_t flip( uint8_t n );
     void printBuffer(uint32_t count){
-        for(int i = 0; i < 100; i++){
+        for(uint32_t i = 0; i < count; i++){
             std::cout << "0b" << std::bitset<8>(dataBuffer[i]) << std::endl;
         }
         /*
@@ -160,6 +160,15 @@ class FT232H {
             std::cout << std::hex << "Channel 8: " << (unsigned int) channelBuffer[7][i] << std::endl;
         }
         */
+    }
+
+    void printChannels(){
+        uint32_t entry;
+        for(int i = 0; i < channelBuffer[0].getEntries(); i++){
+            channelBuffer[0].pop(&entry);
+            std::cout << "Channel1: " << entry << std::endl;
+        }
+        exit(0);
     }
 
     /* Writes each of the channel buffers out to a separate
