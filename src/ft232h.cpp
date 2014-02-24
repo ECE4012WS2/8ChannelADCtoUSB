@@ -29,7 +29,7 @@ uint8_t FT232H::flip( uint8_t n )
 
 /* Constructor, initializes ACBUS pins and initial variables */
 FT232H::FT232H()
-  : SSn_led1(this, 2), CL_led2(this, 3), CLK7_5(this, 1), CS5368_reset(this, 0)
+  : ftStatus(0), ftHandle(0), RxBytes(0),BytesReceived(0), SSn_led1(this, 2), CL_led2(this, 3), CLK7_5(this, 1), CS5368_reset(this, 0)
 {
     /*
      * Upper nibble of CBUS_STATE defines direction.

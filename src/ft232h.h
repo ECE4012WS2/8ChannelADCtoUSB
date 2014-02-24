@@ -11,6 +11,8 @@
  *
  */
 
+#ifndef __FT232H_H_
+#define __FT232H_H_
 /*** Standard library headers ***/
 #include <stdlib.h>             // for exit
 #include <iostream>             // std out
@@ -193,3 +195,4 @@ class FT232H {
     }
 };
 
+#endif
