@@ -1,11 +1,19 @@
-CC=g++
-CFLAGS=libftd2xx.a -ldl -lrt -lpthread -Wall -Wextra
+CC=gcc
+CXX = g++
+CFLAGS=-Wall -Wextra
+LFLAGS=-lftd2xx  -Wl,-rpath /usr/local/lib 
 APP = project
 
-all: $(APP)
+all: clean $(APP)
 
-$(APP): ft232h.h ft232h.cpp main.cpp
-	$(CC) main.cpp ft232h.cpp -o $(APP) $(CFLAGS)
-	
+%.o: %.cpp
+	@echo Compiling $*
+	$(CXX) $(CXXFLAGS) -c $*.cpp
+
+$(APP): ft232h.h ft232h.o main.o
+	$(CXX)  -o $(APP)  ft232h.o main.o $(LFLAGS)
+	@echo Build Complete!
+
 clean:
-	rm -f *.o ; rm $(APP)
+	@rm -fv *.o 
+	@rm -fv $(APP)
