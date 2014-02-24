@@ -75,10 +75,10 @@ class FT232H {
     DWORD BytesReceived;
 
     // Buffer containing all recently read raw data
-    circularBuffer<uint8_t> dataBuffer;
+    CircularBuffer<uint8_t> dataBuffer;
 
     // Buffers for formatted data for each channel
-    circularBuffer<uint32_t> channelBuffer[8];
+    CircularBuffer<uint32_t> channelBuffer[8];
 
   public:
 

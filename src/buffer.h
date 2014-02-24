@@ -21,7 +21,7 @@
 
 
 template<class T>
-class circularBuffer {
+class CircularBuffer {
 private:
 	T* buffer;
 	int size;          // max size of buffer
@@ -29,16 +29,16 @@ private:
 	int entries;          // number of entries
 	int current;
 public:
-	circularBuffer() {
+	CircularBuffer() {
 		size = head = entries = current = 0;
 		buffer = NULL;
 	}
-	circularBuffer(int size) {
+	CircularBuffer(int size) {
 		this->size = size;
 		head = entries = current = 0;
 		buffer = new T[size];
 	}
-	circularBuffer(const circularBuffer &rhs) :
+	CircularBuffer(const CircularBuffer &rhs) :
 			size(rhs.size), head(rhs.head), entries(rhs.entries), current(
 					rhs.current) {
 		buffer = new T[size];
@@ -47,7 +47,7 @@ public:
 		}
 	}
 
-	circularBuffer & operator=(const circularBuffer& rhs) {
+	CircularBuffer & operator=(const CircularBuffer& rhs) {
 
 		//Protect against self assignment
 		if (this != rhs) {
@@ -73,7 +73,7 @@ public:
 		}
 		return *this;
 	}
-	~circularBuffer() {
+	~CircularBuffer() {
 		if (buffer != NULL) {
 			delete[] buffer;
 		}
