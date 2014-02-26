@@ -50,7 +50,30 @@ FT232H::FT232H()
     }
 }
 
+void FT232H::open(){
+
+
+	long locIdBuf[16];
+	for(int i = 0; i < 16; i++) locIdBuf[i] = -1;
+	 int numDevs;
+	ftStatus = FT_ListDevices(locIdBuf,&numDevs,FT_LIST_ALL|FT_OPEN_BY_LOCATION);
+	errCheck("FT_ListDevices cant find a device");
+
+	if (ftStatus == FT_OK) {
+		for(int i = 0; i < 16;++i){
+			std::cout << std::endl << "Location[" << i << "] = " << locIdBuf[i] << std::endl;
+		}
+		this->open(locIdBuf[0]);
+	}
+//
+//	ftStatus = FT_ListDevices(&number,NULL,FT_LIST_NUMBER_ONLY);
+//	errCheck("FT_ListDevices cant find a device");
+//	std::cout << "Got number " << number << std::endl;
+//	this->open(number);
+}
+
 void FT232H::open(uint16_t port){
+
     ftStatus = FT_Open(port, &ftHandle);
     errCheck("FT_Open failed");
 }

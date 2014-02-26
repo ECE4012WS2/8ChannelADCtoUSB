@@ -80,6 +80,8 @@ int main()
     //ft.printBuffer(2048);    
 
     ft.close();
+
+    cout << "Exiting Application" << endl;
     return 0;
 }
 

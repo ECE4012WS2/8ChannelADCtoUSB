@@ -98,7 +98,8 @@ class FT232H {
     FT232H();
 
 /*** Simplified error wrapping functions of FT API calls ***/
-
+    /*Tries to guess the device to open*/
+    void open();
     /* Opens the device at the given port */
     void open(uint16_t port);
     /* Reset the device */
