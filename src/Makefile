@@ -5,7 +5,7 @@ CXXFLAGS=-Wall -Wextra
 LFLAGS=-lftd2xx  -Wl,-rpath /usr/local/lib -L/usr/local/lib 
 APP = project
 
-all: clean $(APP)
+all:` $(APP)
 
 %.o: %.cpp
 	@echo Compiling $*
