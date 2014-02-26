@@ -1,7 +1,8 @@
 CC=gcc
-CXX = g++
+CXX = g++ 
 CFLAGS=-Wall -Wextra
-LFLAGS=-lftd2xx  -Wl,-rpath /usr/local/lib 
+CXXFLAGS=-Wall -Wextra
+LFLAGS=-lftd2xx  -Wl,-rpath /usr/local/lib -L/usr/local/lib 
 APP = project
 
 all: clean $(APP)
