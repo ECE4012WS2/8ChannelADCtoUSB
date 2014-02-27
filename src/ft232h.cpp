@@ -65,11 +65,6 @@ void FT232H::open(){
 		}
 		this->open(locIdBuf[0]);
 	}
-//
-//	ftStatus = FT_ListDevices(&number,NULL,FT_LIST_NUMBER_ONLY);
-//	errCheck("FT_ListDevices cant find a device");
-//	std::cout << "Got number " << number << std::endl;
-//	this->open(number);
 }
 
 void FT232H::open(uint16_t port){
