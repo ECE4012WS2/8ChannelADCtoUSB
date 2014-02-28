@@ -5,14 +5,13 @@
  *      Author: austin
  */
 
-#include <src/Sample.h>
-
+#include "Sample.h"
+#include <iostream>             // std out
 Sample::Sample() {
-	// TODO Auto-generated constructor stub
-
+		std::cout <<"Creating sample object" << std::endl;
 }
 
 Sample::~Sample() {
-	// TODO Auto-generated destructor stub
+		std::cout <<"Destroying sample object" << std::endl;
 }
 
