@@ -35,6 +35,7 @@ class Socket
 		virtual void enableBlock() = 0;
 		bool isBlocking() const;
 		virtual std::ostream& toString(std::ostream& o) const;
+        std::string toString() const;
 	protected:
 		std::string m_hostname;
 		int32_t m_port;
@@ -45,7 +46,7 @@ class Socket
 		bool m_block;
 		void setOpen(bool value);
 		virtual int32_t open() = 0;
-		int rc;
+		ssize_t rc;
 		bool noError(const std::string& msg, int code) const;
 		bool noError(const char* msg, int code) const;
 		bool noError(int code) const;

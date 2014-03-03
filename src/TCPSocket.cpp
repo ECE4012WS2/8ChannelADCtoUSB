@@ -64,13 +64,18 @@ int32_t TCPSocket::send(const void* sendbuff, size_t length)
 	{
 		if (this->isOpen())
 			{
-				size_t sent = 0;
+				ssize_t sent = 0;
+                ssize_t newSent = 0;
 				while (sent < length)
 					{
-						rc = ::send(m_sockfd,
-								(char*) sendbuff + (size_t) sent,
+						newSent = ::send(m_sockfd,
+								(char*) sendbuff + sent,
 								length - sent, 0);
-						noError("TCPSocket: send");
+                        
+						if(!noError("TCPSocket: send",(int)newSent)){
+                            return (int32_t)newSent;
+                        }
+                        sent += newSent;
 					}
 			}
 
@@ -80,12 +85,69 @@ int32_t TCPSocket::send(const void* sendbuff, size_t length)
 
 int32_t TCPSocket::recv()
 	{
-		std::cerr <<"TCP recv NOT IMPLEMENTED" << std::endl;
-		if(this->isOpen()){
-
-		}
-		std::cerr << "Socket not opened! " << this << std::endl;
-		return -1;
+        if (this->isOpen())
+        {
+            
+            fd_set recv_sock;
+            struct timeval timeout;
+            
+            FD_ZERO(&recv_sock);
+            FD_SET(m_sockfd, &recv_sock);
+            int rc;
+            if (!m_block)
+            {
+                timeout.tv_sec = 0;
+                timeout.tv_usec = 1000;
+                //Call select with the timeout
+                rc = select(m_sockfd + 1, &recv_sock, NULL, NULL, &timeout);
+            }
+            else
+            {
+                //infinite timeout
+                rc = select(m_sockfd + 1, &recv_sock, NULL, NULL, NULL);
+            }
+            
+            noError("TCPSocket: select()");
+            
+            //Check that we received data
+            if (rc > 0)
+            {
+                size_t buffSize = 4;
+                char buff[buffSize];
+                bzero(buff, buffSize);
+                if (!m_block)
+                {
+                    rc = (int)::recv(m_sockfd, buff, buffSize, MSG_WAITALL & MSG_DONTWAIT);
+                }
+                else
+                {
+                    rc = (int) ::recv(m_sockfd, buff, buffSize, 0);
+                }
+                
+                //Specific error handling so we cant use noErrors()
+                if (rc == 0)
+                {
+                    close(m_sockfd);
+                    this->setOpen(false);
+                }
+                else if (rc < 0)
+                {
+                    switch (errno)
+                    {
+                        case (EAGAIN): //most likely the same number, here for readability
+                            break;
+                        default:
+                            perror("TCPSocket: recv");
+                            break;
+                    }
+                    
+                }
+                std::cout << "Recieved: " << buff << std::endl;
+                return rc;
+            }
+            
+        }
+        return -1;
 	}
 
 void TCPSocket::dontBlock()
@@ -119,14 +181,14 @@ int32_t TCPSocket::open()
 				rc = connect(m_sockfd, m_res->ai_addr, m_res->ai_addrlen);
 				if (noError("TCPSocket::connect()"))
 					{
-						std::cout << "Waiting for a listener at: " << this
+						std::cout << "Waiting for a listener at: " <<  this.toString()
 								<< std::endl;
 						if (++numTries > 10)
 							{
-								std::cerr << "Could not connect " << this
+								std::cerr << "Could not connect " << this.toString()
 										<< " after 10 tries, exiting "
 										<< std::endl;
-								exit(rc);
+								exit((int)rc);
 							}
 						sleep(1);
 					}
@@ -167,7 +229,7 @@ int32_t TCPSocket::open()
 							{
 								std::cout
 										<< "Waiting for a client to connect on: "
-										<< this << std::endl;
+										<< (Socket*) this << std::endl;
 								if (++numTimeouts >= 10)
 									{
 										std::cerr
@@ -191,7 +253,7 @@ int32_t TCPSocket::open()
 		freeaddrinfo(m_res);
 		this->setOpen(true);
 
-		return rc;
+		return (int)rc;
 	}
 
 std::ostream& TCPSocket::toString(std::ostream& o) const

@@ -14,11 +14,33 @@
 
 #include "ft232h.h"
 #include <unistd.h>
+#include "TCPSocket.h"
 
 using namespace std;
 
+void testSockets(){
+    
+    std::string hostname("127.0.0.1");
+    TCPSocket s(hostname,8080,4,true);
+    
+    std::cout << "Sending 4" << std::endl;
+    
+    char* send =(char*) "work";
+    std::cout << "char buffer: " << send << std::endl;
+    s.send( &send, 4);
+    
+    
+    
+    
+    getchar();
+    
+}
+
+
 int main()
 {
+    
+    testSockets();
     bool first_run = false;             // get this as a cmd arg later
 
     cout << "Initializing... ";

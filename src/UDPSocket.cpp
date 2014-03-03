@@ -23,10 +23,12 @@ UDPSocket::~UDPSocket()
 
 int32_t UDPSocket::send(const void* sendbuff, size_t length)
 	{
+        return 0;
 	}
 
 int32_t UDPSocket::recv()
 	{
+        return 0;
 	}
 
 void UDPSocket::dontBlock()
@@ -39,6 +41,7 @@ void UDPSocket::enableBlock()
 
 int32_t UDPSocket::open()
 	{
+        return 0;
 	}
 
 std::ostream& UDPSocket::toString(std::ostream& o) const

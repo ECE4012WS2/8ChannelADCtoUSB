@@ -143,6 +143,11 @@ std::ostream& Socket::toString(std::ostream& o) const
 		return o << "Socket(" << m_hostname << ":" << m_port << ")";
 	}
 
+std::string Socket::toString() const{
+    std::ostringstream o;
+    
+}
+
 std::ostream& operator<<(std::ostream& o, const Socket& s)
 	{
 		return s.toString(o);
