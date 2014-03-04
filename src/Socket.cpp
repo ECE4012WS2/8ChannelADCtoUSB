@@ -56,6 +56,15 @@ int32_t Socket::close(){
     return -1;
 }
 
+int32_t Socket::send(const std::vector<Sample> elements){
+    int32_t code = 0;
+    for(size_t i = 0; i < elements.size(); ++i){
+        Sample curr = elements[i];
+        code +=send((void*) curr.name.c_str(),curr.name.length());
+    }
+    return code;
+}
+
 int32_t Socket::getSock() const
 	{
 		return m_sockfd;
