@@ -43,8 +43,3 @@ int32_t UDPSocket::open()
 	{
         return 0;
 	}
-
-std::ostream& UDPSocket::toString(std::ostream& o) const
-	{
-		return o << "UDPSocket( " << m_hostname << ":" << m_port << ", bind = " << m_bind << ")";
-	}

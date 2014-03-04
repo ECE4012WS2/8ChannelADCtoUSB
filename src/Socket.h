@@ -23,6 +23,7 @@ class Socket
 		virtual ~Socket();
 		virtual int32_t send(const void* sendbuff, size_t length) = 0;
 		int32_t send(const std::vector<Sample> elements);
+        virtual int32_t close();
 		virtual int32_t recv() = 0;
 		bool isOpen() const;
 		Sample getData();
@@ -34,8 +35,7 @@ class Socket
 		virtual void dontBlock() = 0;
 		virtual void enableBlock() = 0;
 		bool isBlocking() const;
-		virtual std::ostream& toString(std::ostream& o) const;
-        std::string toString() const;
+        virtual std::string toString() const;
 	protected:
 		std::string m_hostname;
 		int32_t m_port;
@@ -58,6 +58,5 @@ class Socket
 
 	};
 
-std::ostream& operator<<(std::ostream& o, const Socket& s);
 
 #endif /* SOCKET_H_ */

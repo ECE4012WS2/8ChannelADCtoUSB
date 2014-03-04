@@ -20,7 +20,6 @@ class TCPSocket: public Socket
 		int32_t recv();
 		void dontBlock();
 		void enableBlock();
-		virtual std::ostream& toString(std::ostream& o) const;
 	private:
 		int32_t open();
 		socklen_t m_clilen;

@@ -20,7 +20,6 @@ class UDPSocket: public Socket
 		int32_t recv();
 		void dontBlock();
 		void enableBlock();
-		virtual std::ostream& toString(std::ostream& o) const;
 	private:
 		bool m_bind;
 		int32_t open();

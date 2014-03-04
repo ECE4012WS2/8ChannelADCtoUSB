@@ -21,16 +21,23 @@ using namespace std;
 void testSockets(){
     
     std::string hostname("127.0.0.1");
-    TCPSocket s(hostname,8080,4,true);
+    TCPSocket s(hostname,8080,4,false);
     
-    std::cout << "Sending 4" << std::endl;
+    std::cout << "Sending" << std::endl;
     
-    char* send =(char*) "work";
+    char send[] = "Hello!\n";
     std::cout << "char buffer: " << send << std::endl;
-    s.send( &send, 4);
+    s.send( send, sizeof(send));
     
     
-    
+    char mybuff[100];
+    while(true){
+//    std::cin >> mybuff;
+//        size_t length = strlen(mybuff);
+//        s.send(mybuff,length);
+//        bzero(mybuff,sizeof(mybuff));
+        s.recv();
+    }
     
     getchar();
     

@@ -7,11 +7,12 @@
 
 #ifndef SAMPLE_H_
 #define SAMPLE_H_
-
+#include <string>
 class Sample {
 public:
 	Sample();
 	virtual ~Sample();
+    std::string name;
 };
 
 #endif /* SAMPLE_H_ */

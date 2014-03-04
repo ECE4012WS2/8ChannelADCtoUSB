@@ -11,12 +11,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <unistd.h>
 #include <iostream>
-
+#include <sstream>
 Socket::Socket(const std::string& hostname, const int32_t& port,
 		const size_t &numberSamples = 0)
 		: m_hostname(hostname), m_port(port), m_sockfd(0), m_type(-1), m_block(
-				false), m_sockOpen(false)
+				true), m_sockOpen(false)
 	{
 		//Resize the deque to reserve data, if we have a number
 		if (numberSamples)
@@ -43,6 +44,17 @@ Sample Socket::getData()
 		m_samples.pop_front();
 		return returnValue;
 	}
+
+int32_t Socket::close(){
+    
+    if(isOpen()){
+        std::cout << "Closing socket: " << toString() << std::endl;
+        this->setOpen(false);
+        return ::close(m_sockfd);
+    }
+    std::cerr <<"Close called on already closed socket! " << toString() << std::endl;
+    return -1;
+}
 
 int32_t Socket::getSock() const
 	{
@@ -138,18 +150,14 @@ bool Socket::noError(int code) const
 		return true;
 	}
 
-std::ostream& Socket::toString(std::ostream& o) const
-	{
-		return o << "Socket(" << m_hostname << ":" << m_port << ")";
-	}
-
 std::string Socket::toString() const{
-    std::ostringstream o;
+    
+    std::stringstream s;
+    
+    s << m_hostname << ":" << m_port;
+    
+    return s.str();
     
 }
 
-std::ostream& operator<<(std::ostream& o, const Socket& s)
-	{
-		return s.toString(o);
-	}
 
