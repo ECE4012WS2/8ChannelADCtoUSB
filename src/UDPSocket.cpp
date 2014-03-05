@@ -50,7 +50,7 @@ UDPSocket::~UDPSocket()
 int32_t UDPSocket::send(const void* sendbuff, size_t length)
 	{
         int numBytes = 0;
-        while(numBytes < length){
+        while((size_t)numBytes < length){
         numBytes += sendto(m_sockfd, (char*)sendbuff + numBytes, length - numBytes, 0, (struct sockaddr *) &m_servaddr,sizeof(m_servaddr));
             
         }
@@ -68,12 +68,12 @@ int32_t UDPSocket::recv()
         char buff[buffSize];
         bzero(buff, buffSize);
         
-        int bytesRecv = 0;
+        int32_t bytesRecv = 0;
         if(m_block){
-            bytesRecv = recvfrom(m_sockfd,(void*) buff, buffSize,NULL,NULL,NULL);
+            bytesRecv = (int32_t)recvfrom(m_sockfd,(void*) buff, buffSize,0,NULL,NULL);
         }
         else{
-            bytesRecv = recvfrom(m_sockfd,(void*)buff, buffSize,MSG_DONTWAIT,NULL,NULL);
+            bytesRecv = (int32_t)recvfrom(m_sockfd,(void*)buff, buffSize,MSG_DONTWAIT,NULL,NULL);
         }
         std::cout << "Received: " << buff << std::endl;
         return bytesRecv;

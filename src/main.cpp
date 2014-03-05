@@ -31,7 +31,7 @@ void testSockets(){
     s.send( send, sizeof(send));
     
     
-    char mybuff[100];
+
     while(true){
 //    std::cin >> mybuff;
 //        size_t length = strlen(mybuff);

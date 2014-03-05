@@ -67,7 +67,7 @@ int32_t TCPSocket::send(const void* sendbuff, size_t length)
     {
         ssize_t sent = 0;
         ssize_t bytesSent = 0;
-        while (sent < length)
+        while (sent < (ssize_t)length)
         {
             bytesSent = ::send(m_sockfd,
                                (char*) sendbuff + sent,
@@ -147,7 +147,7 @@ int32_t TCPSocket::recv()
                 
             }
             std::cout << "Recieved: " << buff << std::endl;
-            return rc;
+            return (int32_t)rc;
         }
         
     }
