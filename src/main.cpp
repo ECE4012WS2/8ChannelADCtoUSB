@@ -14,8 +14,36 @@
 
 #include "ft232h.h"
 #include <unistd.h>
+#include "TCPSocket.h"
+#include "UDPSocket.h"
 
 using namespace std;
+
+void testSockets(){
+    
+    std::string hostname("127.0.0.1");
+    UDPSocket s(hostname,8080,4,true);
+    
+    std::cout << "Sending" << std::endl;
+    
+    char send[] = "Hello!\n";
+    std::cout << "char buffer: " << send << std::endl;
+    s.send( send, sizeof(send));
+    
+    
+
+    while(true){
+//    std::cin >> mybuff;
+//        size_t length = strlen(mybuff);
+//        s.send(mybuff,length);
+//        bzero(mybuff,sizeof(mybuff));
+        s.recv();
+    }
+    
+    getchar();
+    
+}
+
 
 int main()
 {
