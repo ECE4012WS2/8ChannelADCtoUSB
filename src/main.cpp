@@ -15,13 +15,14 @@
 #include "ft232h.h"
 #include <unistd.h>
 #include "TCPSocket.h"
+#include "UDPSocket.h"
 
 using namespace std;
 
 void testSockets(){
     
     std::string hostname("127.0.0.1");
-    TCPSocket s(hostname,8080,4,false);
+    UDPSocket s(hostname,8080,4,true);
     
     std::cout << "Sending" << std::endl;
     
@@ -46,8 +47,6 @@ void testSockets(){
 
 int main()
 {
-    
-    testSockets();
     bool first_run = false;             // get this as a cmd arg later
 
     cout << "Initializing... ";
