@@ -84,16 +84,18 @@ class FT232H {
 
 /*** CBUS bit-bang IO mode pins ***/
 
-    // FT1248 active low slave select, also tied to led1 on UM232H (ACBUS8)
-    ACBUS_out SSn_led1;
-    // D flip-flop active low clear, also tied to led2 on UM232H (ACBUS9)
-    ACBUS_out CL_led2;
-    // Clock, 7.5Mhz
-    ACBUS_out CLK7_5;
-    // CS5368 active low reset (ACBUS5)
-    ACBUS_out CS5368_reset;
-    // Remaining IO pin, unused for now (ACBUS6)
-    //ACBUS_out gpio;
+    // FT1248 slave select and CS5368 reset, also tied to led1 on UM232H
+    //     1 = select FT1248 and release CS5368 reset
+    //     0 = diselect FT1248 and reset CS5368
+    ACBUS_out SSn_RST_led1;         // ACBUS8
+    // D flip-flop active low clear, also tied to led2 on UM232H
+    ACBUS_out CL_led2;              // ACBUS9
+    // ADC speed mode select pins:
+    //     M1 = 0, M0 = 0: single-speed 2kHz - 54kHz
+    //     M1 = 0, M0 = 1: double-speed 54kHz - 108kHz
+    //     M1 = 1, M0 = 0: quad-speed 108kHz - 216kHz
+    ACBUS_out M1;                   // ACBUS6
+    ACBUS_out M0;                   // ACBUS5
 
     FT232H();
 

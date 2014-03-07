@@ -62,19 +62,13 @@ int main()
     }
 
     cout << "Setting up." << endl;
-    ft.SSn_led1 = 1;                    // not selecting FT1248
+    ft.SSn_RST_led1 = 1;                // diselect FT1248 and hold ADC in reset
     ft.CL_led2 = 0;                     // clear flip flop
-    ft.CS5368_reset = 0;                // hold ADC in reset
 
     sleep(1);
 
-    cout << "Starting CS5368." << endl;
-    ft.CS5368_reset = 1;                // release reset
-
-    sleep(1);
-
-    cout << "Enabling FT1248 interface." << endl;
-    ft.SSn_led1 = 0;                    // enable FT1248
+    cout << "Starting CS5368 and enabling FT1248 interface." << endl;
+    ft.SSn_RST_led1 = 1;                // select FT1248 and elease ADC reset
 
     sleep(1);
 

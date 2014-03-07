@@ -29,15 +29,15 @@ uint8_t FT232H::flip( uint8_t n )
 
 /* Constructor, initializes ACBUS pins and initial variables */
 FT232H::FT232H()
-  : ftStatus(0), ftHandle(0), RxBytes(0),BytesReceived(0), SSn_led1(this, 2), CL_led2(this, 3), CLK7_5(this, 1), CS5368_reset(this, 0)
+  : ftStatus(0), ftHandle(0), RxBytes(0),BytesReceived(0), SSn_RST_led1(this, 2), CL_led2(this, 3), M1(this, 1), M0(this, 0)
 {
     /*
      * Upper nibble of CBUS_STATE defines direction.
      * Lower nibble defines the output with this mapping:
      *      bit 3: ACBUS 9 (flip flop clear)
-     *      bit 2: ACBUS 8 (FT1248 slave select)
-     *      bit 1: ACBUS 6 (7.5 Mhz clock)
-     *      bit 0: ACBUS 5 (CS5368 reset)
+     *      bit 2: ACBUS 8 (FT1248 slave select and CS5368 RST))
+     *      bit 1: ACBUS 6 (ADC speed mode select M1)
+     *      bit 0: ACBUS 5 (ADC speed mode select M0)
      *
      */
     CBUS_STATE = 0xF0;          // all pins are outputs, default low
