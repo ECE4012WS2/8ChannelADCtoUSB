@@ -109,7 +109,7 @@ void FT232H::read(){
 
         if(RxBytes != BytesReceived){
             cout << "Bytes read mis-match" << endl;
-            exit(0);
+            exit(1);
         }
     }
 
@@ -123,7 +123,7 @@ DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout){
     errCheck("FT_Read");
     if(BytesReceived < bytes){
         cout << "Timed out in blockingRead" << endl;
-        exit(0);
+        exit(1);
     }
 
 /******************************************************************************************
@@ -186,7 +186,7 @@ void FT232H::alignToNextLRCK(uint8_t LRCK){
         i++;
         if(i > 8){
             //cout << "Error: Over 32 clock cycles seen for one sample!" << endl;
-            //exit(0);
+            //exit(1);
         }
     }
 }
@@ -301,7 +301,7 @@ void FT232H::errCheck(string errString)
         default:
             cout << "UNKNOWN_ERROR: " << errString << endl;
     }
-    exit(0);
+    exit(1);
 }
 
 ACBUS_out::ACBUS_out(FT232H* ft, uint8_t index){
