@@ -1,8 +1,8 @@
 
 system('make');
-status = system('./project');
+system('./project');
 
-if(status == 0)
+
 c1 = dlmread('channel1.csv', ',');
 c2 = dlmread('channel2.csv', ',');
 c3 = dlmread('channel3.csv', ',');
@@ -43,5 +43,3 @@ subplot(8,1,8)
 plot(c8(:,1), c8(:,2));
 title('Channel 8');
 xlabel('Sample Number');
-
-end

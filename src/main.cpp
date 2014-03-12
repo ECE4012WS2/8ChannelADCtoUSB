@@ -47,7 +47,7 @@ void testSockets(){
 
 int main()
 {
-    bool first_run = false;             // get this as a cmd arg later
+    bool first_run = true;             // get this as a cmd arg later
 
     cout << "Initializing... ";
     FT232H ft;
