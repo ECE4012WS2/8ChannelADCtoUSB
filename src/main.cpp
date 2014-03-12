@@ -91,7 +91,7 @@ int main()
     cout << "Done." << endl;
 
     // Format 200 times (so there will be ~100 samples in each channel)
-    for(int i = 0; i < 200; i++){
+    for(int i = 0; i < 400; i++){
         ft.formatSample();
     }
     

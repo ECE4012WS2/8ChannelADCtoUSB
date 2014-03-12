@@ -1,3 +1,8 @@
+
+system('make');
+system('./project');
+
+
 c1 = dlmread('channel1.csv', ',');
 c2 = dlmread('channel2.csv', ',');
 c3 = dlmread('channel3.csv', ',');
@@ -6,6 +11,12 @@ c5 = dlmread('channel5.csv', ',');
 c6 = dlmread('channel6.csv', ',');
 c7 = dlmread('channel7.csv', ',');
 c8 = dlmread('channel8.csv', ',');
+
+scrsz = get(0,'ScreenSize');
+
+hfig = figure;
+set(hfig,'position',scrsz);
+
 
 subplot(8,1,1)
 plot(c1(:,1), c1(:,2));
