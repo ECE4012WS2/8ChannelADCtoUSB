@@ -14,12 +14,40 @@
 
 #include "ft232h.h"
 #include <unistd.h>
+#include "TCPSocket.h"
+#include "UDPSocket.h"
 
 using namespace std;
 
+void testSockets(){
+    
+    std::string hostname("127.0.0.1");
+    UDPSocket s(hostname,8080,4,true);
+    
+    std::cout << "Sending" << std::endl;
+    
+    char send[] = "Hello!\n";
+    std::cout << "char buffer: " << send << std::endl;
+    s.send( send, sizeof(send));
+    
+    
+
+    while(true){
+//    std::cin >> mybuff;
+//        size_t length = strlen(mybuff);
+//        s.send(mybuff,length);
+//        bzero(mybuff,sizeof(mybuff));
+        s.recv();
+    }
+    
+    getchar();
+    
+}
+
+
 int main()
 {
-    bool first_run = false;             // get this as a cmd arg later
+    bool first_run = true;             // get this as a cmd arg later
 
     cout << "Initializing... ";
     FT232H ft;
@@ -34,11 +62,22 @@ int main()
     }
 
     cout << "Setting up." << endl;
-    ft.initCS5368();
+    ft.SSn_RST_led1 = 1;                // diselect FT1248 and hold ADC in reset
+    ft.CL_led2 = 0;                     // clear flip flop
 
     sleep(1);
 
-    // Clear buffers before reading anything
+    cout << "Starting CS5368 and enabling FT1248 interface." << endl;
+    ft.SSn_RST_led1 = 1;                // select FT1248 and elease ADC reset
+
+    sleep(1);
+
+    // FT1248 should be seeings all zeros at this point, which sets
+    // it up for 8-bit mode and storing received data into buffer
+
+    cout << "Enabling flip flop to clock data from ADC." << endl;
+    ft.CL_led2 = 1;                     // release clear on flip flop
+
     cout << "Clearing buffers on FT232H... ";
     ft.purge();                         // clear buffers
     cout << "Cleared." << endl << endl;
@@ -51,7 +90,7 @@ int main()
     }
     cout << "Done." << endl;
 
-    // Format 400 times (so there will be ~200 samples in each channel)
+    // Format 200 times (so there will be ~100 samples in each channel)
     for(int i = 0; i < 400; i++){
         ft.formatSample();
     }
