@@ -26,7 +26,10 @@
 
 /*** Other supporting headers ***/
 #include "buffer.h"             // managing buffer
+//#include "TCPSocket.h"
+//#include "UDPSocket.h"
 
+#define DEBUG_PRINT             // define this for stdout status
 
 /*** Global constants ***/
 const uint32_t RAW_BUFFER_SIZE = 12800;
@@ -67,14 +70,21 @@ union PDN_REG
 };
 struct CS5368_REGS
 {
+    // Registers with defined field names details
     uint8_t GCTL_addr;          // global control register
-    uint8_t OVFM_addr;          // disable overflow interrupts
-    uint8_t HPF_addr;           // disable high-pass filters
-    uint8_t PDN_addr;           // power down register
-    uint8_t MUTE_addr;          // mute individual channels
-    uint8_t SDEN_addr;          // SDOUT enable control register
     union GCTL_REG GCTL;
+    uint8_t PDN_addr;           // power down register
     union PDN_REG PDN;
+
+    // Registers that does not have field details (yet?)
+    uint8_t OVFM_addr;          // disable overflow interrupts
+    uint8_t OVFM;
+    uint8_t HPF_addr;           // disable high-pass filters
+    uint8_t HPF;
+    uint8_t MUTE_addr;          // mute individual channels
+    uint8_t MUTE;
+    uint8_t SDEN_addr;          // SDOUT enable control register
+    uint8_t SDEN;
 };
 
 /*
@@ -106,22 +116,6 @@ class ACBUS_out
     uint8_t operator!() const;
 };
 
-/*** Handles SPI protocol on 3 GPIO pins ***/
-class ADC_SPI
-{
-  private:
-    FT232H* ft;                 // associated device
-    ACBUS_out* CDIN;
-    ACBUS_out* CCLK;
-    ACBUS_out* CSn_CL;
-    uint8_t CHIP_ADDRESS;       // CS5368 SPI chip address
-  public:
-    ADC_SPI(FT232H* ft, ACBUS_out* CDIN, ACBUS_out* CCLK, ACBUS_out* CSn_CL);
-
-    /* Writes data to the register map (addr) */
-    void write(uint8_t map, uint8_t data);
-};
-
 /*
  * Main class of abstraction of the D2XX API for supporting
  * the specific interface to the CS5368 ADC chip
@@ -130,12 +124,12 @@ class ADC_SPI
 class FT232H
 {
   friend class ACBUS_out;       // allow access to status variables
-  friend class ADC_SPI;
 
   private:
     FT_STATUS ftStatus;             // stores status on each API call
     FT_HANDLE ftHandle;             // FT232H device handle
     uint8_t CBUS_STATE;             // maintains current CBUS IO pin state
+    uint8_t CHIP_ADDRESS;           // SPI address
     CS5368_REGS adc_regs;
 
     // Buffer and variables for storing results of each read
@@ -156,9 +150,6 @@ class FT232H
     ACBUS_out CDIN;             // ACBUS6
     ACBUS_out CCLK;             // ACBUS8
     ACBUS_out CSn_CL;           // ACBUS9
-
-    // Handles SPI protocol on 3 GPIO pins
-    ADC_SPI SPI;
 
     FT232H();
 
@@ -194,6 +185,15 @@ class FT232H
     void alignToNextLRCK(uint8_t LRCK);
 
 /*** Supporting functions ***/
+
+    /*
+     * Writes data to the specified register. Data must first be
+     * defined (i.e. adc_regs.MUTE = 0xff). Argument is the
+     * addressed of the entrie register
+     * (i.e. write_SPI(&adc_regs.MUTE.all)
+     *
+     */
+    void write_SPI(uint8_t* reg);
 
     /*
      * Called to program desired values into the EEPROM,

@@ -30,8 +30,14 @@ uint8_t flip( uint8_t n )
 
 /* Constructor, initializes ACBUS pins and initial variables */
 FT232H::FT232H()
-  : ftStatus(0), ftHandle(0), RxBytes(0),BytesReceived(0), SSn_RST(this, 0),
-    CDIN(this, 1), CCLK(this, 2), CSn_CL(this, 3), SPI(this, &CDIN, &CCLK, &CSn_CL)
+  : ftStatus(0),
+    ftHandle(0),
+    RxBytes(0),
+    BytesReceived(0),
+    SSn_RST(this, 0),
+    CDIN(this, 1),
+    CCLK(this, 2),
+    CSn_CL(this, 3)
 {
     /*
      * Upper nibble of CBUS_STATE defines direction.
@@ -52,6 +58,7 @@ FT232H::FT232H()
     }
 
     // Set register address map for ADC
+    CHIP_ADDRESS = 0x9E;            // ADC chip address with write bit
     adc_regs.GCTL_addr = 0x01;
     adc_regs.OVFM_addr = 0x03;
     adc_regs.HPF_addr = 0x04;
@@ -62,6 +69,11 @@ FT232H::FT232H()
 
 void FT232H::initCS5368()
 {
+
+#ifdef DEBUG_PRINT
+    cout << "Preparing output pins" << endl;
+#endif
+
     // Prepare chips and interfaces
     SSn_RST.set(0);         // hold ADC in reset and don't select FT1248
     CDIN.set(0);            // zero data line
@@ -70,17 +82,29 @@ void FT232H::initCS5368()
 
     usleep(20000);
 
+#ifdef DEBUG_PRINT
+    cout << "Initializing CS5368" << endl;
+#endif
+
     SSn_RST = 1;            // release ADC from reset and select FT1248
 
     usleep(20000);
+
+#ifdef DEBUG_PRINT
+    cout << "Writing to CS5368 Control Register" << endl;
+#endif
 
     // Set Global Control Register and write to ADC with SPI
     adc_regs.GCTL.bit.CP_EN = 0x1;          // enable control port mode
     adc_regs.GCTL.bit.CLKMODE = 0x0;        // no divide by 1.5
     adc_regs.GCTL.bit.MDIV = 0x1;           // divide by 2
     adc_regs.GCTL.bit.DIF = 0x0;            // left justified mode
-    adc_regs.GCTL.bit.MODE = 0x2;           // quadruple-speed mode
-    SPI.write(adc_regs.GCTL_addr, adc_regs.GCTL.all);       // write to ADC
+    adc_regs.GCTL.bit.MODE = 0x0;           // quadruple-speed mode
+    write_SPI(&adc_regs.GCTL.all);          // write to ADC
+
+    // Disable high pass filter
+    //adc_regs.HPF = 0xFF;
+    //write_SPI(&adc_regs.HPF.all);
 }
 
 void FT232H::open()
@@ -102,11 +126,21 @@ void FT232H::open()
 void FT232H::open(uint16_t port)
 {
 
+#ifdef DEBUG_PRINT
+    cout << "Opening FT232H Device" << endl;
+#endif
+
     ftStatus = FT_Open(port, &ftHandle);
     errCheck("FT_Open failed");
 }
 
-void FT232H::reset(){
+void FT232H::reset()
+{
+
+#ifdef DEBUG_PRINT
+    cout << "Reseting FT232H" << endl;
+#endif
+
     ftStatus = FT_SetBitMode(ftHandle, 0x00, FT_BITMODE_RESET);
     errCheck("Reset failed");
 
@@ -115,7 +149,12 @@ void FT232H::reset(){
     errCheck("FT_SetTimeouts");
 }
 
-void FT232H::purge(){
+void FT232H::purge()
+{
+
+#ifdef DEBUG_PRINT
+    cout << "Purging buffers" << endl;
+#endif
 
     // Clear both receive and send buffers on FT232H
     ftStatus = FT_Purge(ftHandle, FT_PURGE_RX | FT_PURGE_TX);
@@ -124,13 +163,17 @@ void FT232H::purge(){
 
 void FT232H::close()
 {
+
+#ifdef DEBUG_PRINT
+    cout << "Closing FT232H Device" << endl;
+#endif
+
     ftStatus = FT_Close(ftHandle);
     errCheck("FT_Close failed");
 }
 
 void FT232H::read()
 {
-
     // Get the number bytes currently in FT232H's buffer
     ftStatus = FT_GetQueueStatus(ftHandle, &RxBytes);
     errCheck("FT_GetQueueStatus failed");
@@ -153,6 +196,11 @@ void FT232H::read()
 
 DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout)
 {
+
+#ifdef DEBUG_PRINT
+    cout << "Reading " << (int) bytes << " bytes of data (blocking)" << endl;
+#endif
+
     ftStatus = FT_SetTimeouts(ftHandle, timeout, 1000);
     errCheck("FT_SetTimeouts");
     ftStatus = FT_Read(ftHandle, RxBuffer, bytes, &BytesReceived);
@@ -229,8 +277,66 @@ void FT232H::alignToNextLRCK(uint8_t LRCK)
     }
 }
 
+void FT232H::write_SPI(uint8_t* reg)
+{
+    uint32_t clock_wait = 10000;
+    uint8_t map = *(reg-1);
+    uint8_t data = *reg;
+
+    CSn_CL.set(1);
+    CCLK = 1;
+
+    cout << "Press c to continue" << endl;
+    int c;
+    do {
+         c=getchar();
+         putchar (c);
+    } while (c != 'c');
+    cout << endl;
+
+    usleep(clock_wait);
+
+    uint8_t addr = flip(CHIP_ADDRESS);
+    for(int i = 0; i < 16; i++){
+        if(i == 0) CSn_CL.set(0);
+        CCLK.set(!CCLK);
+        if(i%2 == 0){
+            CDIN.set(addr & 0x01);
+            addr >>= 1;
+        }
+        CDIN.write();
+        usleep(clock_wait);
+    }
+    map = flip(map);
+    for(int i = 0; i < 16; i++){
+        CCLK.set(!CCLK);
+        if(!CCLK){
+            CDIN.set(map & 0x01);
+            map >>= 1;
+        }
+        CDIN.write();
+        usleep(clock_wait);
+    }
+    data = flip(data);
+    for(int i = 0; i < 18; i++){
+        CCLK.set(!CCLK);
+        if(!CCLK && i < 16){
+            CDIN.set(data & 0x01);
+            data >>= 1;
+        }
+        if(i == 16) CSn_CL.set(1);
+    CDIN.write();
+        usleep(clock_wait);
+    }
+}
+
 void FT232H::programEEPROM()
 {
+
+#ifdef DEBUG_PRINT
+    cout << "Programming EEPROM" << endl;
+#endif
+
     static FT_PROGRAM_DATA Data;            // static for initial zeros
     char manufacturer[] = "FTDI";
     char manufacturerID[] = "FT";
@@ -372,66 +478,5 @@ void ACBUS_out::operator=(uint8_t out)
 uint8_t ACBUS_out::operator!() const
 {
     return !value;
-}
-
-ADC_SPI::ADC_SPI(FT232H* ft, ACBUS_out* CDIN, ACBUS_out* CCLK, ACBUS_out* CSn_CL)
-{
-    CHIP_ADDRESS = 0x9E;            // ADC chip address with write bit
-    this->ft = ft;
-    this->CDIN = CDIN;
-    this->CSn_CL = CSn_CL;
-    this->CCLK = CCLK;
-}
-
-void ADC_SPI::write(uint8_t map, uint8_t data)
-{
-    uint32_t clock_wait = 10000;
-
-    CSn_CL->set(1);
-    *CCLK = 1;
-
-    /*
-    cout << "rasing cs" << endl;
-    int c;
-    do {
-         c=getchar();
-         putchar (c);
-    } while (c != 'c');
-    */
-
-    usleep(clock_wait);
-
-    uint8_t addr = flip(CHIP_ADDRESS);
-    for(int i = 0; i < 16; i++){
-        if(i == 0) CSn_CL->set(0);
-        CCLK->set(!(*CCLK));
-        if(i%2 == 0){
-            CDIN->set(addr & 0x01);
-            addr >>= 1;
-        }
-        CDIN->write();
-        usleep(clock_wait);
-    }
-    map = flip(map);
-    for(int i = 0; i < 16; i++){
-        CCLK->set(!(*CCLK));
-        if(!(*CCLK)){
-            CDIN->set(map & 0x01);
-            map >>= 1;
-        }
-        CDIN->write();
-        usleep(clock_wait);
-    }
-    data = flip(data);
-    for(int i = 0; i < 18; i++){
-        CCLK->set(!(*CCLK));
-        if(!(*CCLK) && i < 16){
-            CDIN->set(data & 0x01);
-            data >>= 1;
-        }
-        if(i == 16) CSn_CL->set(1);
-        CDIN->write();
-        usleep(clock_wait);
-    }
 }
 
