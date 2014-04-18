@@ -26,15 +26,15 @@
 
 /*** Other supporting headers ***/
 #include "buffer.h"             // managing buffer
-//#include "TCPSocket.h"
-//#include "UDPSocket.h"
+#include "TCPSocket.h"
+#include "UDPSocket.h"
 
 #define DEBUG_PRINT             // define this for stdout status
 
 /*** Global constants ***/
 const uint32_t RAW_BUFFER_SIZE = 12800;
 const uint32_t CHANNEL_BUFFER_SIZE = 200;
-
+const uint32_t SPI_WAIT = 10000;                // us wait between clock switches
 
 class FT232H;                   // declare class existance
 
@@ -123,14 +123,77 @@ class ACBUS_out
  */
 class FT232H
 {
-  friend class ACBUS_out;       // allow access to status variables
 
+/*****************************************************************************
+ *  User API
+ *****************************************************************************/
+  public:
+    FT232H();
+    ~FT232H();
+
+    /* Initiates the ADC to start sampling, goes through a reset cycle */
+    void init_ADC();
+
+    /* Sets sampling rate of ADC with 5 possible values derived from
+     * the crystal oscillator. Argument is in bps.
+     *
+     * NOTE: Call this AFTER initiating the ADC followed by clear()
+     */
+    void setSamplingRate(int rate);
+
+    /* Specifies number of channels to use */
+    void setChannelNum(int n);
+
+    /* Set frequency of crystal on the board if not 27Mhz */
+    void setCrystalFreq(int freq);
+
+    /*** Local Functions ***/
+
+    /* Buffers each channel up to the requested number. Make sure all
+     * channels have been read to an even level before calling */
+    void buffer(int samples);
+
+    /* Populates given buffer with samples from requested channel */
+    void read(int* buf, int samples, int channel);
+
+    /*** Network Functions ***/
+
+    /* TCP or UDP */
+    void setSocketType(std::string type);
+
+    void connect(std::string ip, int port);
+
+    void disconnect();
+
+    void send(int sample_count);
+
+    /* Clears all buffers, should be called before reading/sending data */
+    void clear();
+
+    /*
+     * Called to program desired values into the EEPROM,
+     * should be called only once on the first run for each device.
+     *
+     * FT1248 mode and settings is set along with ACBUS pins.
+     *
+     */
+    void programEEPROM();
+
+/*****************************************************************************
+ *  Underlying Interface Controls
+ *****************************************************************************/
   private:
     FT_STATUS ftStatus;             // stores status on each API call
     FT_HANDLE ftHandle;             // FT232H device handle
     uint8_t CBUS_STATE;             // maintains current CBUS IO pin state
-    uint8_t CHIP_ADDRESS;           // SPI address
-    CS5368_REGS adc_regs;
+    uint8_t CHIP_ADDRESS;           // ADC SPI address
+    CS5368_REGS adc_regs;           // ADC registers
+    uint32_t crystal_freq;          // in Hz (set to 27Mhz default)
+    Socket* socket;
+    uint8_t socket_type;            // 1 = TCP, 0 = UDP
+    std::string ip;
+    uint32_t port;
+    uint32_t channel_num;                // number of adc channels, 8 default
 
     // Buffer and variables for storing results of each read
     uint8_t RxBuffer[1024];         // buffer size on FT232H is 1k bytes
@@ -139,24 +202,18 @@ class FT232H
 
     // Buffer containing all recently read raw data
     CircularBuffer<uint8_t> dataBuffer;
-
     // Buffers for formatted data for each channel
     CircularBuffer<uint32_t> channelBuffer[8];
 
-  public:
-
     // FT232H GPIO output pins
-    ACBUS_out SSn_RST;          // ACBUS5
-    ACBUS_out CDIN;             // ACBUS6
-    ACBUS_out CCLK;             // ACBUS8
-    ACBUS_out CSn_CL;           // ACBUS9
+    ACBUS_out SSn_RST;              // ACBUS5
+    ACBUS_out CDIN;                 // ACBUS6
+    ACBUS_out CCLK;                 // ACBUS8
+    ACBUS_out CSn_CL;               // ACBUS9
 
-    FT232H();
 
-    /* Initializes ADC with default parameters */
-    void initCS5368();
+    /*** Simplified error wrapping functions of FT API calls ***/
 
-/*** Simplified error wrapping functions of FT API calls ***/
     /*Tries to guess the device to open*/
     void open();
     /* Opens the device at the given port */
@@ -168,7 +225,8 @@ class FT232H
     /* Close the handle on the device */
     void close();
 
-/*** Functions managing receive buffer ***/
+
+    /*** Functions managing receive buffer ***/
 
     /* Reads in available data and adds it to the dataBuffer */
     void read();
@@ -184,7 +242,8 @@ class FT232H
     /* Throw away all samples until the next change in LRCK */
     void alignToNextLRCK(uint8_t LRCK);
 
-/*** Supporting functions ***/
+
+    /*** Supporting functions ***/
 
     /*
      * Writes data to the specified register. Data must first be
@@ -195,15 +254,6 @@ class FT232H
      */
     void write_SPI(uint8_t* reg);
 
-    /*
-     * Called to program desired values into the EEPROM,
-     * should be called only once on the first run for each device.
-     *
-     * FT1248 mode and settings is set along with ACBUS pins.
-     *
-     */
-    void programEEPROM();
-
     /* 
      * Used by member functions to check error.
      * Error type and passed in string is printed out and
@@ -212,22 +262,8 @@ class FT232H
      */
     void errCheck(std::string errString);
 
-/*** Debugging functions ***/
 
-    void printBuffer(uint32_t count){
-        for(uint32_t i = 0; i < count; i++){
-            std::cout << "0b" << std::bitset<8>(dataBuffer[i]) << std::endl;
-        }
-    }
-
-    void printChannels(){
-        uint32_t entry;
-        for(int i = 0; i < channelBuffer[0].getEntries(); i++){
-            channelBuffer[0].pop(&entry);
-            std::cout << "Channel1: " << entry << std::endl;
-        }
-        exit(0);
-    }
+    /*** Debugging functions ***/
 
     /* Writes each of the channel buffers out to a separate
      * file in csv format
@@ -249,6 +285,8 @@ class FT232H
             file.close();
         }
     }
+
+  friend class ACBUS_out;       // allow access to status variables
 };
 
 #endif

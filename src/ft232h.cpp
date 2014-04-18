@@ -30,15 +30,21 @@ uint8_t flip( uint8_t n )
 
 /* Constructor, initializes ACBUS pins and initial variables */
 FT232H::FT232H()
-  : ftStatus(0),
-    ftHandle(0),
-    RxBytes(0),
-    BytesReceived(0),
-    SSn_RST(this, 0),
+  : SSn_RST(this, 0),
     CDIN(this, 1),
     CCLK(this, 2),
     CSn_CL(this, 3)
 {
+    ftStatus = 0;
+    ftHandle = 0;
+    crystal_freq = 27000000;
+    socket_type = 1;
+    channel_num = 8;
+    RxBytes = 0;
+    BytesReceived = 0;
+    ip = "127.0.0.1";
+    port = 0;
+    socket = NULL;
     /*
      * Upper nibble of CBUS_STATE defines direction.
      * Lower nibble defines the output with this mapping:
@@ -65,9 +71,150 @@ FT232H::FT232H()
     adc_regs.PDN_addr = 0x06;
     adc_regs.MUTE_addr = 0x08;
     adc_regs.SDEN_addr = 0x0A;
+
+    // Open device and reset it
+    open(0);
+    reset();
 }
 
-void FT232H::initCS5368()
+FT232H::~FT232H()
+{
+    if(socket) delete[] socket;
+    close();
+}
+
+void FT232H::setSamplingRate(int rate)
+{
+    double r = (double) rate;
+    double max_rates[5];
+
+    // Calculate avaliable rates derived from crystal frequency
+    max_rates[0] = (double) crystal_freq / 64;
+    max_rates[1] = max_rates[0] / 1.5;
+    max_rates[2] = max_rates[0] / 2;
+    max_rates[3] = max_rates[0] / 3;
+    max_rates[4] = max_rates[0] / 4;
+
+    // Set clock dividers appropriately
+    if(r < max_rates[0]+5 && r > max_rates[0]-5){
+        adc_regs.GCTL.bit.CLKMODE = 0x0;
+        adc_regs.GCTL.bit.MDIV = 0x0;
+        write_SPI(&adc_regs.GCTL.all);
+    }else if(r < max_rates[1]+5 && r > max_rates[1]-5){
+        adc_regs.GCTL.bit.CLKMODE = 0x1;
+        adc_regs.GCTL.bit.MDIV = 0x0;
+        write_SPI(&adc_regs.GCTL.all);
+    }else if(r < max_rates[2]+5 && r > max_rates[2]-5){
+        adc_regs.GCTL.bit.CLKMODE = 0x0;
+        adc_regs.GCTL.bit.MDIV = 0x1;
+        write_SPI(&adc_regs.GCTL.all);
+    }else if(r < max_rates[3]+5 && r > max_rates[3]-5){
+        adc_regs.GCTL.bit.CLKMODE = 0x1;
+        adc_regs.GCTL.bit.MDIV = 0x1;
+        write_SPI(&adc_regs.GCTL.all);
+    }else if(r < max_rates[4]+5 && r > max_rates[4]-5){
+        adc_regs.GCTL.bit.CLKMODE = 0x0;
+        adc_regs.GCTL.bit.MDIV = 0x2;
+        write_SPI(&adc_regs.GCTL.all);
+    }else{
+        std::cout << "Unknown sampling rate. Valid values are:" << std::endl;
+        for(int i = 0; i < 5; i++){
+            std::cout << max_rates[0]/1000 << " (kHz)" << std::endl;
+        }
+        exit(1);
+    }
+}
+
+void FT232H::setChannelNum(int n)
+{
+    channel_num = (uint32_t) n;
+}
+
+void FT232H::setCrystalFreq(int freq)
+{
+    crystal_freq = (uint32_t) freq;
+}
+
+void FT232H::connect(string ip, int port)
+{
+    if(socket){
+        cout << "Error connection already exists" << endl;
+        exit(1);
+    }
+    if(socket_type == 1){
+        socket = new TCPSocket(ip, port, 100, true);
+    }else if(socket_type == 0){
+        socket = new UDPSocket(ip, port, 100, true);
+    }
+}
+
+void FT232H::disconnect()
+{
+    delete[] socket;
+    socket = NULL;
+}
+
+void FT232H::send(int sample_count)
+{
+    buffer(sample_count);
+}
+
+void FT232H::clear()
+{
+    purge();
+    dataBuffer.clearN(dataBuffer.getEntries());
+    for(int i = 0; i < 8; i++){
+        channelBuffer[i].clearN(channelBuffer[i].getEntries());
+    }
+}
+
+void FT232H::buffer(int sample_count)
+{
+    if((uint32_t)sample_count*64 > RAW_BUFFER_SIZE-64){
+        cout << "Error: " << sample_count << " samples requested exceeds "
+             << (int) (RAW_BUFFER_SIZE-64)/64 << " limit.";
+        exit(1);
+    }
+
+    // Find out how many more samples are needed
+    if(channelBuffer[0].getEntries() >= sample_count) return;
+    else sample_count -= channelBuffer[0].getEntries();
+
+    // Keep reading in data from FT232H buffer in chunks of 1k
+    // until there is enough for the requested samples
+    while(dataBuffer.getEntries() < (sample_count*64+64)){
+        blockingRead(1000, 5000);
+    }
+
+    // Format samples from raw buffer into channel buffer
+    for(int i = 0; i < sample_count; i++) formatSample();
+}
+
+void FT232H::read(int* buf, int samples, int channel)
+{
+    if((uint32_t)channel > channel_num){
+        cout << "Error: Channel " << channel << " requested when there is only "
+             << channel_num << " channels in use" << endl;
+        exit(1);
+    }
+    channelBuffer[channel-1].getN((uint32_t*)buf, samples);
+    channelBuffer[channel-1].clearN(samples);
+}
+
+void FT232H::setSocketType(std::string type)
+{
+    if(type.compare("UDP")){
+        socket_type = 0;
+    }else if(type.compare("TCP")){
+        socket_type = 1;
+    }else{
+        cout << "Error: socket type not recognized. Options are:"
+             << endl << "TCP" << endl << "UDP" << endl;
+        exit(1);
+    }
+}
+
+void FT232H::init_ADC()
 {
 
 #ifdef DEBUG_PRINT
@@ -99,12 +246,17 @@ void FT232H::initCS5368()
     adc_regs.GCTL.bit.CLKMODE = 0x0;        // no divide by 1.5
     adc_regs.GCTL.bit.MDIV = 0x1;           // divide by 2
     adc_regs.GCTL.bit.DIF = 0x0;            // left justified mode
-    adc_regs.GCTL.bit.MODE = 0x0;           // quadruple-speed mode
+    adc_regs.GCTL.bit.MODE = 0x2;           // quadruple-speed mode
     write_SPI(&adc_regs.GCTL.all);          // write to ADC
 
-    // Disable high pass filter
-    //adc_regs.HPF = 0xFF;
-    //write_SPI(&adc_regs.HPF.all);
+    // Initialize other register values to default ADC values
+    adc_regs.PDN.all = 0x00;                // everything is powered
+    adc_regs.HPF = 0x00;                    // high pass filter enabled
+    adc_regs.OVFM = 0xFF;                   // overflow interrupt enabled
+    adc_regs.MUTE = 0x00;                   // no muted
+    adc_regs.SDEN = 0x00;                   // SDOUT pins enabled
+
+    CSn_CL = 1;             // 
 }
 
 void FT232H::open()
@@ -224,29 +376,36 @@ for(DWORD i = 0; i < BytesReceived; i++){
 
 bool FT232H::formatSample()
 {
+    // Make sure enough data is in buffer
     if(dataBuffer.getEntries() < 100) return false;
 
     uint8_t entry;
     // Peek into first entry for the LRCK bit, which is high in LJ mode
-    // when the channel is even
+    // when the channel is odd
     dataBuffer.getN(&entry, 1);
     uint8_t LRCK = entry & 1;
 
+    uint32_t i0, i1, i2, i3;
     // Add a new entry for the even or odd channels, depending on LRCK 
-    uint32_t i0 = channelBuffer[1-LRCK].add(0);
-    uint32_t i1 = channelBuffer[3-LRCK].add(0);
-    uint32_t i2 = channelBuffer[5-LRCK].add(0);
-    uint32_t i3 = channelBuffer[7-LRCK].add(0);
+    // and how many channels needed
+    if(channel_num >= (uint32_t)(2-LRCK)) i0 = channelBuffer[1-LRCK].add(0);
+    if(channel_num >= (uint32_t)(4-LRCK)) i1 = channelBuffer[3-LRCK].add(0);
+    if(channel_num >= (uint32_t)(6-LRCK)) i2 = channelBuffer[5-LRCK].add(0);
+    if(channel_num >= (uint32_t)(8-LRCK)) i3 = channelBuffer[7-LRCK].add(0);
 
     // For each of the next 24 bits, store the bit into the correct
     // position of each channel sample buffer
     for(int i = 0; i < 24; i++){
         dataBuffer.getN(&entry, 1);                 // Get one entry
         if(LRCK != (entry&1)) return true;
-        channelBuffer[1-LRCK][i0] |= ((uint32_t) ((entry&2)>>1) << (23-i));
-        channelBuffer[3-LRCK][i1] |= ((uint32_t) ((entry&4)>>2) << (23-i));
-        channelBuffer[5-LRCK][i2] |= ((uint32_t) ((entry&8)>>3) << (23-i));
-        channelBuffer[7-LRCK][i3] |= ((uint32_t) ((entry&16)>>4) << (23-i));
+        if(channel_num >= (uint32_t)(2-LRCK))
+            channelBuffer[1-LRCK][i0] |= ((uint32_t) ((entry&2)>>1) << (23-i));
+        if(channel_num >= (uint32_t)(4-LRCK))
+            channelBuffer[3-LRCK][i1] |= ((uint32_t) ((entry&4)>>2) << (23-i));
+        if(channel_num >= (uint32_t)(6-LRCK))
+            channelBuffer[5-LRCK][i2] |= ((uint32_t) ((entry&8)>>3) << (23-i));
+        if(channel_num >= (uint32_t)(8-LRCK))
+            channelBuffer[7-LRCK][i3] |= ((uint32_t) ((entry&16)>>4) << (23-i));
         dataBuffer.clearN(1);                       // Remove one entry
     }
 
@@ -279,10 +438,11 @@ void FT232H::alignToNextLRCK(uint8_t LRCK)
 
 void FT232H::write_SPI(uint8_t* reg)
 {
-    uint32_t clock_wait = 10000;
-    uint8_t map = *(reg-1);
-    uint8_t data = *reg;
+    uint32_t clock_wait = 10000;        // clock change wait time
+    uint8_t map = *(reg-1);             // get register address
+    uint8_t data = *reg;                // copy data
 
+    // Initialize select and clock lines high
     CSn_CL.set(1);
     CCLK = 1;
 
@@ -296,17 +456,22 @@ void FT232H::write_SPI(uint8_t* reg)
 
     usleep(clock_wait);
 
+    // Send ship address
     uint8_t addr = flip(CHIP_ADDRESS);
-    for(int i = 0; i < 16; i++){
-        if(i == 0) CSn_CL.set(0);
-        CCLK.set(!CCLK);
+    for(int i = 0; i < 16; i++){        // 16 clock changes to write 8 bits
+        if(i == 0) CSn_CL.set(0);       // drop select when starting
+        CCLK.set(!CCLK);                // flip clock every time
+
+        // Update bit every time clock drops
         if(i%2 == 0){
             CDIN.set(addr & 0x01);
             addr >>= 1;
         }
-        CDIN.write();
-        usleep(clock_wait);
+        CDIN.write();                   // write all pin changes
+        usleep(clock_wait);             // delay
     }
+
+    // Send register address
     map = flip(map);
     for(int i = 0; i < 16; i++){
         CCLK.set(!CCLK);
@@ -317,6 +482,8 @@ void FT232H::write_SPI(uint8_t* reg)
         CDIN.write();
         usleep(clock_wait);
     }
+
+    // Send data to write
     data = flip(data);
     for(int i = 0; i < 18; i++){
         CCLK.set(!CCLK);
@@ -325,7 +492,7 @@ void FT232H::write_SPI(uint8_t* reg)
             data >>= 1;
         }
         if(i == 16) CSn_CL.set(1);
-    CDIN.write();
+        CDIN.write();
         usleep(clock_wait);
     }
 }
@@ -445,7 +612,7 @@ void FT232H::errCheck(string errString)
         default:
             cout << "UNKNOWN_ERROR: " << errString << endl;
     }
-    exit(0);
+    exit(1);
 }
 
 ACBUS_out::ACBUS_out(FT232H* ft, uint8_t index)

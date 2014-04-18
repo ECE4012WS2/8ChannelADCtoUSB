@@ -19,42 +19,29 @@ using namespace std;
 
 int main()
 {
-    cout << "Starting" << endl;
     bool first_run = false;             // get this as a cmd arg later
-
     FT232H ft;
-    ft.open(0);
-    ft.reset();
 
+    // Configuration parameters
     if(first_run) ft.programEEPROM();
+    ft.setChannelNum(8);
+    ft.setCrystalFreq(27000000);
+    ft.setSocketType("TCP");
 
-    ft.initCS5368();
+    // Initialize ADC and to start sampling
+    ft.init_ADC();
 
-    sleep(1);
-
-    // Clear buffers before reading anything
-    ft.purge();                         // clear buffers
-
-    // Read in 20,000 bytes of data
-    // buffer (which will overflow)
-    for(int i = 0; i < 20; i++){
-        ft.blockingRead(1000, 5000);
-    }
-
-    // Format 400 times (so there will be ~200 samples in each channel)
-    for(int i = 0; i < 400; i++){
-        ft.formatSample();
-    }
+    // Setting sampling rate, which must be followed by buffer clear
+    ft.setSamplingRate(210000);
+    ft.clear();
     
-    // Write contents of buffer out to files for easy graphing
-    ft.writeBuf2File();
+    // Read 200 samples into buffer
+    ft.buffer(200);
 
-    //cout << "Buffer contains:" << endl;
-    //ft.printBuffer(2048);    
+    // Copy samples for channel 1 to array
+    int* channel1 = new int[200];
+    ft.read(channel1, 200, 1);
 
-    ft.close();
-
-    cout << "Exiting Application" << endl;
     return 0;
 }
 
