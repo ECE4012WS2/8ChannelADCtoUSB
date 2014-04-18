@@ -93,7 +93,7 @@ public:
 	}
 	/* Gets the next item until the end is reached */
 	bool getNext(T& item) {
-		if (current == -1 || entries == 0)
+		if (current == -1 || entries == 0 || current == (head+entries)%size)
 			return false;
 		item = buffer[current];
 		current = (current + 1) % size;
