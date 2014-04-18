@@ -32,8 +32,8 @@
 #define DEBUG_PRINT             // define this for stdout status
 
 /*** Global constants ***/
-const uint32_t RAW_BUFFER_SIZE = 12800;
-const uint32_t CHANNEL_BUFFER_SIZE = 200;
+const uint32_t RAW_BUFFER_SIZE = 25600;
+const uint32_t CHANNEL_BUFFER_SIZE = 400;
 const uint32_t SPI_WAIT = 10000;                // us wait between clock switches
 
 class FT232H;                   // declare class existance
@@ -179,6 +179,7 @@ class FT232H
      */
     void programEEPROM();
 
+
 /*****************************************************************************
  *  Underlying Interface Controls
  *****************************************************************************/
@@ -268,6 +269,7 @@ class FT232H
     /* Writes each of the channel buffers out to a separate
      * file in csv format
      */
+  public:
     void writeBuf2File(){
         std::ofstream file;
         uint32_t entry;

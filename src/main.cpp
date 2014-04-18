@@ -25,22 +25,25 @@ int main()
     // Configuration parameters
     if(first_run) ft.programEEPROM();
     ft.setChannelNum(8);
-    ft.setCrystalFreq(27000000);
+    ft.setCrystalFreq(24576000);
     ft.setSocketType("TCP");
 
     // Initialize ADC and to start sampling
     ft.init_ADC();
 
     // Setting sampling rate, which must be followed by buffer clear
-    ft.setSamplingRate(210000);
+    //ft.setSamplingRate(96000);
     ft.clear();
     
     // Read 200 samples into buffer
     ft.buffer(200);
 
+/*
     // Copy samples for channel 1 to array
     int* channel1 = new int[200];
     ft.read(channel1, 200, 1);
+*/
+    ft.writeBuf2File();
 
     return 0;
 }

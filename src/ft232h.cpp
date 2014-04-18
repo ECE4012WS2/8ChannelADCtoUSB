@@ -37,7 +37,7 @@ FT232H::FT232H()
 {
     ftStatus = 0;
     ftHandle = 0;
-    crystal_freq = 27000000;
+    crystal_freq = 27450000;
     socket_type = 1;
     channel_num = 8;
     RxBytes = 0;
@@ -86,7 +86,18 @@ FT232H::~FT232H()
 void FT232H::setSamplingRate(int rate)
 {
     double r = (double) rate;
+    double mclk = crystal_freq;
     double max_rates[5];
+
+    if( r > 108000){
+        adc_regs.GCTL.bit.MODE = 0x2;           // quadruple-speed mode
+    }else if(r > 54000){
+        adc_regs.GCTL.bit.MODE = 0x1;           // double-speed mode
+        mclk /= 2;
+    }else{
+        adc_regs.GCTL.bit.MODE = 0x0;           // single-speed mode
+        mclk /= 4;
+    }
 
     // Calculate avaliable rates derived from crystal frequency
     max_rates[0] = (double) crystal_freq / 64;
@@ -98,7 +109,7 @@ void FT232H::setSamplingRate(int rate)
     // Set clock dividers appropriately
     if(r < max_rates[0]+5 && r > max_rates[0]-5){
         adc_regs.GCTL.bit.CLKMODE = 0x0;
-        adc_regs.GCTL.bit.MDIV = 0x0;
+        adc_regs.GCTL.bit.MDIV = 0x1;
         write_SPI(&adc_regs.GCTL.all);
     }else if(r < max_rates[1]+5 && r > max_rates[1]-5){
         adc_regs.GCTL.bit.CLKMODE = 0x1;
@@ -119,7 +130,7 @@ void FT232H::setSamplingRate(int rate)
     }else{
         std::cout << "Unknown sampling rate. Valid values are:" << std::endl;
         for(int i = 0; i < 5; i++){
-            std::cout << max_rates[0]/1000 << " (kHz)" << std::endl;
+            std::cout << max_rates[i]/1000 << " (kHz)" << std::endl;
         }
         exit(1);
     }
@@ -161,11 +172,13 @@ void FT232H::send(int sample_count)
 
 void FT232H::clear()
 {
-    purge();
     dataBuffer.clearN(dataBuffer.getEntries());
     for(int i = 0; i < 8; i++){
         channelBuffer[i].clearN(channelBuffer[i].getEntries());
     }
+    purge();
+    blockingRead(64, 5000);
+    alignToNextLRCK(0);
 }
 
 void FT232H::buffer(int sample_count)
@@ -187,7 +200,7 @@ void FT232H::buffer(int sample_count)
     }
 
     // Format samples from raw buffer into channel buffer
-    for(int i = 0; i < sample_count; i++) formatSample();
+    for(int i = 0; i < sample_count*2; i++) formatSample();
 }
 
 void FT232H::read(int* buf, int samples, int channel)
@@ -365,9 +378,11 @@ DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout)
 /******************************************************************************************
  * MSIO0 is MSB apparently, temporary flip in software, re-wire hardware in final design
  ******************************************************************************************/
+/*
 for(DWORD i = 0; i < BytesReceived; i++){
     RxBuffer[i] = flip(RxBuffer[i]);
 }
+*/
 /******************************************************************************************/
 
     dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
@@ -377,7 +392,9 @@ for(DWORD i = 0; i < BytesReceived; i++){
 bool FT232H::formatSample()
 {
     // Make sure enough data is in buffer
-    if(dataBuffer.getEntries() < 100) return false;
+    if(dataBuffer.getEntries() < 100){
+        return false;
+    }
 
     uint8_t entry;
     // Peek into first entry for the LRCK bit, which is high in LJ mode
@@ -446,6 +463,7 @@ void FT232H::write_SPI(uint8_t* reg)
     CSn_CL.set(1);
     CCLK = 1;
 
+/*
     cout << "Press c to continue" << endl;
     int c;
     do {
@@ -453,6 +471,7 @@ void FT232H::write_SPI(uint8_t* reg)
          putchar (c);
     } while (c != 'c');
     cout << endl;
+*/
 
     usleep(clock_wait);
 
