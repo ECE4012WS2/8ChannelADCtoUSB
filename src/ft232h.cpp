@@ -500,8 +500,8 @@ void FT232H::alignToNextLRCK(uint8_t LRCK)
         dataBuffer.getN(&entry, 1);         // Grab the next entry
         i++;
         if(i > 8){
-            cout << "Error: Over 32 clock cycles seen for one sample!" << endl;
-            exit(1);
+//            cout << "Error: Over 32 clock cycles seen for one sample!" << endl;
+//            exit(1);
         }
     }
 }
