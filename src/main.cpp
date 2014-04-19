@@ -38,7 +38,7 @@ int main()
     // Read 200 samples into buffer
     
     ft.connect("192.168.1.101", 5555);
-    getchar();
+	std::cout <<"Starting streaming" << std::endl;
     while(true){
     ft.buffer(6000);
         ft.send(6000);
