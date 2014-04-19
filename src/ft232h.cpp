@@ -465,7 +465,6 @@ bool FT232H::formatSample()
     // position of each channel sample buffer
     for(int i = 0; i < 24; i++){
         dataBuffer.getN(&entry, 1);                 // Get one entry
-cout << "format: " << (int) entry << endl;
         if(LRCK != (entry&1)) return true;
         if(channel_num >= (uint32_t)(2-LRCK))
             channelBuffer[1-LRCK][i0] |= ((uint32_t) ((entry&2)>>1) << (23-i));
@@ -494,7 +493,6 @@ void FT232H::alignToNextLRCK(uint8_t LRCK)
     dataBuffer.getN(&entry, 1);
     //if(LRCK > 1) LRCK = entry & 1;
     while((entry&1) == LRCK){               // Check if LRCK is still the same
-cout << "align: " << (int) entry << endl;
         //dataBuffer.pop(&entry);
         dataBuffer.clearN(1);               // Get rid of it
         dataBuffer.getN(&entry, 1);         // Grab the next entry
