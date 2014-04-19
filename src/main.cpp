@@ -36,6 +36,8 @@ int main()
     ft.clear();
     
     // Read 200 samples into buffer
+    
+    ft.connect("192.168.1.101", 5555);
     while(true){
     ft.buffer(6000);
         ft.send(6000);

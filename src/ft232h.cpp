@@ -44,7 +44,7 @@ FT232H::FT232H()
     channel_num = 8;
     RxBytes = 0;
     BytesReceived = 0;
-    ip = "127.0.0.1";
+    ip = "192.168.1.101";
     port = 0;
     socket = NULL;
     /*
