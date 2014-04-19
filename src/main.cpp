@@ -19,7 +19,7 @@ using namespace std;
 
 int main()
 {
-    bool first_run = false;             // get this as a cmd arg later
+    bool first_run = true;             // get this as a cmd arg later
     FT232H ft;
 
     // Configuration parameters
@@ -36,7 +36,7 @@ int main()
     ft.clear();
     
     // Read 200 samples into buffer
-    ft.buffer(200);
+    ft.buffer(6000);
 
 /*
     // Copy samples for channel 1 to array

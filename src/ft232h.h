@@ -32,8 +32,8 @@
 #define DEBUG_PRINT             // define this for stdout status
 
 /*** Global constants ***/
-const uint32_t RAW_BUFFER_SIZE = 25600;
-const uint32_t CHANNEL_BUFFER_SIZE = 400;
+const uint32_t RAW_BUFFER_SIZE = 409600;
+const uint32_t CHANNEL_BUFFER_SIZE = 6400;
 const uint32_t SPI_WAIT = 10000;                // us wait between clock switches
 
 class FT232H;                   // declare class existance
@@ -137,7 +137,7 @@ class FT232H
     /* Sets sampling rate of ADC with 5 possible values derived from
      * the crystal oscillator. Argument is in bps.
      *
-     * NOTE: Call this AFTER initiating the ADC followed by clear()
+     * NOTE: Call this AFTER initiating the ADC and followed by clear()
      */
     void setSamplingRate(int rate);
 
@@ -171,7 +171,7 @@ class FT232H
     void clear();
 
     /*
-     * Called to program desired values into the EEPROM,
+     * Called to program ft232h device,
      * should be called only once on the first run for each device.
      *
      * FT1248 mode and settings is set along with ACBUS pins.
