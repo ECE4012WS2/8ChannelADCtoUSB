@@ -153,6 +153,7 @@ void FT232H::connect(string ip, int port)
         exit(1);
     }
     if(socket_type == 1){
+        cout <<"Creating TCP Socket" << endl;
         socket = new TCPSocket(ip, port, 100, true);
     }else if(socket_type == 0){
         socket = new UDPSocket(ip, port, 100, true);
