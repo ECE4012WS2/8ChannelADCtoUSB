@@ -14,8 +14,6 @@
 #include "ft232h.h"
 #include <unistd.h>             // usleep
 
-#include "time.h"
-
 using namespace std;
 
 int count = 0;
@@ -221,16 +219,11 @@ void FT232H::buffer(int sample_count)
     if(channelBuffer[0].getEntries() >= sample_count) return;
     else sample_count -= channelBuffer[0].getEntries();
 
-    struct timespec start, end;
-
     // Keep reading in data from FT232H buffer in chunks of 500 bytes
     // until there is enough for the requested samples
-    clock_gettime(CLOCK_REALTIME, &start);
     while(dataBuffer.getEntries() < (sample_count*64+64)){
         blockingRead(500, 5000);
     }
-    clock_gettime(CLOCK_REALTIME, &end);
-    cout << "s: " << end.tv_sec-start.tv_sec << " ns: " << end.tv_nsec-start.tv_nsec << endl;
 
 /*
     ofstream file;
