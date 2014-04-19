@@ -36,7 +36,10 @@ int main()
     ft.clear();
     
     // Read 200 samples into buffer
+    while(true){
     ft.buffer(6000);
+        ft.send(6000);
+    }
 
 /*
     // Copy samples for channel 1 to array
