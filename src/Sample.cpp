@@ -8,7 +8,7 @@
 #include "Sample.h"
 #include <iostream>             // std out
 Sample::Sample() {
-		std::cout <<"Creating sample object" << std::endl;
+//		std::cout <<"Creating sample object" << std::endl;
     name = std::string("Sample");
     
 }

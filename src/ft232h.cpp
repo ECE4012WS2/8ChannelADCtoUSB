@@ -156,6 +156,7 @@ void FT232H::connect(string ip, int port)
         cout <<"Creating TCP Socket" << endl;
         socket = new TCPSocket(ip, port, 100, true);
     }else if(socket_type == 0){
+                cout <<"Creating UDP Socket" << endl;
         socket = new UDPSocket(ip, port, 100, true);
     }
 }
@@ -264,9 +265,9 @@ void FT232H::read(int* buf, int samples, int channel)
 
 void FT232H::setSocketType(std::string type)
 {
-    if(type.compare("UDP")){
+    if(!type.compare("UDP")){
         socket_type = 0;
-    }else if(type.compare("TCP")){
+    }else if(!type.compare("TCP")){
         socket_type = 1;
     }else{
         cout << "Error: socket type not recognized. Options are:"
@@ -415,7 +416,7 @@ DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout)
 {
 
 #ifdef DEBUG_PRINT
-    cout << "Reading " << (int) bytes << " bytes of data (blocking)" << endl;
+//    cout << "Reading " << (int) bytes << " bytes of data (blocking)" << endl;
 #endif
 
     ftStatus = FT_SetTimeouts(ftHandle, timeout, 1000);
