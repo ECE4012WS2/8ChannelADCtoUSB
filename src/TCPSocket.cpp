@@ -159,10 +159,10 @@ void TCPSocket::dontBlock()
     m_block = false;
     int flags;
     flags = fcntl(m_sockfd, F_GETFL, 0);
-    if (!noError("TCPSocket: fcntl: F_GETFL", flags)) return;
+    if (!noError("TCPSocket(__LINE__): fcntl: F_GETFL", flags)) return;
     
     rc = fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK);
-    if (!noError("TCPSocket: fcntl: F_SETFL")) return;
+    if (!noError("TCPSocket(__LINE__): fcntl: F_SETFL")) return;
     
 }
 
@@ -171,10 +171,10 @@ void TCPSocket::enableBlock()
     m_block = true;
     int orig_flags;
     orig_flags = fcntl(m_sockfd, F_GETFL, 0);
-    if (!noError("TCPSocket: fcntl: F_GETFL", orig_flags)) return;
+    if (!noError("TCPSocket(__LINE__): fcntl: F_GETFL", orig_flags)) return;
     
     rc = fcntl(m_sockfd, F_SETFL, orig_flags | !O_NONBLOCK);
-    if (!noError("TCPSocket: fcntl: F_SETFL")) return;
+    if (!noError("TCPSocket(__LINE__): fcntl: F_SETFL")) return;
 }
 
 int32_t TCPSocket::open()
