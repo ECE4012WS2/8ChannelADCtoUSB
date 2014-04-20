@@ -29,7 +29,7 @@
 #include "TCPSocket.h"
 #include "UDPSocket.h"
 
-#define DEBUG_PRINT             // define this for stdout status
+//#define DEBUG_PRINT             // define this for stdout status
 
 /*** Global constants ***/
 const uint32_t RAW_BUFFER_SIZE = 409600;
@@ -241,7 +241,7 @@ class FT232H
     bool formatSample();
 
     /* Throw away all samples until the next change in LRCK */
-    void alignToNextLRCK(uint8_t LRCK);
+    void alignToNextLRCK(uint8_t LRCK, uint8_t limit);
 
 
     /*** Supporting functions ***/

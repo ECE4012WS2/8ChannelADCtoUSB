@@ -19,13 +19,14 @@ using namespace std;
 
 int main()
 {
-    bool first_run = true;             // get this as a cmd arg later
+    bool first_run = false;             // get this as a cmd arg later
     FT232H ft;
 
     // Configuration parameters
     if(first_run) ft.programEEPROM();
     ft.setChannelNum(8);
-    ft.setCrystalFreq(24576000);
+    //ft.setCrystalFreq(24576000);
+    ft.setCrystalFreq(27460000);
     ft.setSocketType("TCP");
 
     // Initialize ADC and to start sampling
@@ -36,7 +37,19 @@ int main()
     ft.clear();
     
     // Read 200 samples into buffer
-    ft.buffer(6000);
+    //ft.buffer(1000);
+
+    
+    int buff[1000];
+    for(int i = 0; i < 100; i++){
+        ft.buffer(1000);
+        for(int j = 1; j <= 8; j++){
+            ft.read(buff, 1000, j);
+        }
+    }
+    
+    //for(int i = 0; i < 1000; i++) cout << buff[i] << endl;
+        ft.buffer(1000);
 
 /*
     // Copy samples for channel 1 to array
