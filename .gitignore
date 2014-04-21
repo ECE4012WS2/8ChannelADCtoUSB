@@ -2,3 +2,4 @@
 project
 .settings
 *.csv
+.DS_Store
