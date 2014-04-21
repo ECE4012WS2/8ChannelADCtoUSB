@@ -199,7 +199,7 @@ class FT232H
     uint32_t channel_num;                // number of adc channels, 8 default
 
     // Buffer and variables for storing results of each read
-    uint8_t RxBuffer[100000];         // buffer size on FT232H is 1k bytes
+    uint8_t RxBuffer[1024];         // buffer size on FT232H is 1k bytes
     DWORD RxBytes;
     DWORD BytesReceived;
 
