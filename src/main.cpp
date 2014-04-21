@@ -33,7 +33,7 @@ int main()
     ft.init_ADC();
 
     // Setting sampling rate, which must be followed by buffer clear
-    //ft.setSamplingRate(96000);
+    ft.setSamplingRate(107265);
     //ft.setHighPassFilter(false);
     ft.clear();
     

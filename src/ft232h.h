@@ -29,7 +29,7 @@
 #include "TCPSocket.h"
 #include "UDPSocket.h"
 
-//#define DEBUG_PRINT             // define this for stdout status
+#define DEBUG_PRINT             // define this for stdout status
 
 /*** Global constants ***/
 const uint32_t RAW_BUFFER_SIZE = 409600;
@@ -199,7 +199,7 @@ class FT232H
     uint32_t channel_num;                // number of adc channels, 8 default
 
     // Buffer and variables for storing results of each read
-    uint8_t RxBuffer[1024];         // buffer size on FT232H is 1k bytes
+    uint8_t RxBuffer[100000];         // buffer size on FT232H is 1k bytes
     DWORD RxBytes;
     DWORD BytesReceived;
 
@@ -236,7 +236,7 @@ class FT232H
 
     /* Reads in the requested amount of data within the time frame,
      * or else times out */
-    DWORD blockingRead(DWORD bytes, DWORD timeout);
+    DWORD blockingRead(DWORD bytes);
 
     /* Formats a single sample for 4 channels from the global raw data
      * buffer and stores it into its respective buffer */

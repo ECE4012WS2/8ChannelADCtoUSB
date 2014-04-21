@@ -16,6 +16,8 @@
 
 #include "time.h"
 
+//#define TIME_LOG
+
 using namespace std;
 
 /* debugging variables */
@@ -130,12 +132,31 @@ void FT232H::setSamplingRate(int rate)
         adc_regs.GCTL.bit.CLKMODE = 0x0;
         adc_regs.GCTL.bit.MDIV = 0x2;
     }else{
-        std::cout << "Unknown sampling rate. Valid values are:" << std::endl;
-        for(int i = 0; i < 5; i++){
-            std::cout << max_rates[i]/1000 << " (kHz)" << std::endl;
+        std::cout << "Unknown sampling rate. "
+                  << "Valid rates with current crystal are:" << std::endl;
+        double dividers[] = {1, 1.5, 2, 3, 4};
+        for(int i = 1; i <= 4; i*=2){
+            mclk = crystal_freq / 64 / i;
+            for(int j = 0; j < 5; j++){
+                r = mclk / dividers[j];
+                if(i == 1 && r <= 216000 && r >= 108000){
+                    cout << "quadruple-speed mode: " << (int)r << " Hz" << endl;
+                }else if(i == 2 && r < 108000 && r >= 54000){
+                    cout << "double-speed mode:    " << (int)r << " Hz" << endl;
+                }else if(i == 4 && r >= 2000 && r < 54000){
+                    cout << "single-speed mode:    " << (int)r << " Hz" << endl;
+                }
+            }
         }
         exit(1);
     }
+
+#ifdef DEBUG_PRINT
+    cout << "Sampling speed of " << r << " requested" << endl;
+    cout << "MODE is set to: " << (int)adc_regs.GCTL.bit.MODE << endl;
+    cout << "CLKMODE is set to: " << (int)adc_regs.GCTL.bit.CLKMODE << endl;
+    cout << "MDIV is set to: " << (int)adc_regs.GCTL.bit.MDIV << endl;
+#endif
 
     // Write global control register
     write_SPI(&adc_regs.GCTL.all);
@@ -212,7 +233,7 @@ void FT232H::clear()
     purge();
 
     // Read in a little data
-    blockingRead(64, 5000);
+    blockingRead(64);
 
     // Align data as odd channels for each sample is clocked out first
     alignToNextLRCK(1, 32);
@@ -232,17 +253,20 @@ void FT232H::buffer(int sample_count)
     if(channelBuffer[0].getEntries() >= sample_count) return;
     else sample_count -= channelBuffer[0].getEntries();
 
-    //struct timespec start, end;
 
-    // Keep reading in data from FT232H buffer in chunks of 500 bytes
+#ifdef DEBUG_PRINT
+    cout << "Buffering " << sample_count << " samples...";
+#endif
+
+    // Keep reading in data from FT232H buffer in chunks of 1k bytes
     // until there is enough for the requested samples
     while(dataBuffer.getEntries() < (sample_count+1)*64){
-    //clock_gettime(CLOCK_REALTIME, &start);
-        blockingRead(1024, 5000);
-        //readBuffer();
-    //clock_gettime(CLOCK_REALTIME, &end);
-    //cout << "s: " << end.tv_sec-start.tv_sec << " ns: " << end.tv_nsec-start.tv_nsec << endl;
+        blockingRead(1024);
     }
+
+#ifdef DEBUG_PRINT
+    cout << "Done" << endl;
+#endif
 
 /*
     ofstream file;
@@ -407,8 +431,23 @@ void FT232H::close()
 
 void FT232H::readBuffer()
 {
+
+#ifdef TIME_LOG
+    struct timespec start, end;
+    clock_gettime(CLOCK_REALTIME, &start);
+#endif
+
+    // Even non blocking FTDI calls take too long, which will cause
+    // the buffer to overflow at high sampling speeds!
+
     // Get the number bytes currently in FT232H's buffer
     ftStatus = FT_GetQueueStatus(ftHandle, &RxBytes);
+
+#ifdef TIME_LOG
+    clock_gettime(CLOCK_REALTIME, &end);
+    cout << "readBuffer s: " << end.tv_sec-start.tv_sec << " ns: " << end.tv_nsec-start.tv_nsec << endl;
+#endif
+
     errCheck("FT_GetQueueStatus failed");
 
     if(RxBytes > 0){
@@ -425,11 +464,20 @@ void FT232H::readBuffer()
     }
 }
 
-DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout)
+DWORD FT232H::blockingRead(DWORD bytes)
 {
-    ftStatus = FT_SetTimeouts(ftHandle, timeout, 1000);
-    errCheck("FT_SetTimeouts");
+#ifdef TIME_LOG
+    struct timespec start, end;
+    clock_gettime(CLOCK_REALTIME, &start);
+#endif
+
     ftStatus = FT_Read(ftHandle, RxBuffer, bytes, &BytesReceived);
+
+#ifdef TIME_LOG
+    clock_gettime(CLOCK_REALTIME, &end);
+    cout << "blockingRead s: " << end.tv_sec-start.tv_sec << " ns: " << end.tv_nsec-start.tv_nsec << endl;
+#endif
+
     errCheck("FT_Read");
     if(BytesReceived < bytes){
         cout << "Timed out in blockingRead" << endl;
@@ -451,11 +499,6 @@ DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout)
     */
 
     dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
-
-#ifdef DEBUG_PRINT
-    cout << (int) BytesReceived << " bytes of data read (blocking)" << endl;
-#endif
-
     return BytesReceived;
 }
 
@@ -518,8 +561,8 @@ void FT232H::alignToNextLRCK(uint8_t LRCK, uint8_t limit)
         dataBuffer.clearN(1);               // Get rid of it
         i++;
         if(i > limit){
-            cout << "Warning: Over 32 clock cycles seen for one sample!"
-                 << "Possible buffer overflow on FT232H device" << endl;
+//            cout << "Warning: Over 32 clock cycles seen for one sample!"
+//                 << "Possible buffer overflow on FT232H device" << endl;
 //            for(int i = 0; i < 64; i++) cout << (int) history[i] << endl;
 //            exit(1);
         }
