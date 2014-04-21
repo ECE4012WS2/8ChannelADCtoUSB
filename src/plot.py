@@ -6,27 +6,30 @@ import socket
 from multiprocessing import Process
 
 #From StackOverflow
-def get_file(plotnum):
-  print "Waiting for file: channel" + str(plotnum) + ".csv"
+def get_files():
+  numFiles = 1;
   s = socket.socket()
   s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
   s.bind(("",3000))
   s.listen(10)
+  print "Waiting for file: channel" + str(numFiles) + ".csv"
+  while(numFiles < 9):
+    sc, address = s.accept()
+    f = open('channel'+ str(numFiles)+".csv",'w')
+    i=1
 
-  sc, address = s.accept()
+    i=i+1
+    l = sc.recv(1024)
+    while (l):
+            f.write(l)
+            l = sc.recv(1024)
 
-  i=1
-  f = open('channel'+ str(plotnum)+".csv",'w')
-  i=i+1
-  l = sc.recv(1024)
-  while (l):
-          f.write(l)
-          l = sc.recv(1024)
-  f.close()
-
-  sc.close()
+    f.close()
+    sc.close()
+    print "Got file:  channel" + str(numFiles) + ".csv"
+    numFiles = numFiles + 1
   s.close()
-  print "Got file:  channel" + str(plotnum) + ".csv"
+
 
 
 def read_datafile(file_name,plotnum):
@@ -54,8 +57,7 @@ def read_datafile(file_name,plotnum):
 
 fig = plt.figure()
 
-for i in range(1,9):
-  get_file(i);
+get_files();
 
 
 data = read_datafile('./channel1.csv',1)
