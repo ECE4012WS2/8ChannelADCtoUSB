@@ -29,7 +29,7 @@
 #include "TCPSocket.h"
 #include "UDPSocket.h"
 
-#define DEBUG_PRINT             // define this for stdout status
+//#define DEBUG_PRINT             // define this for stdout status
 
 /*** Global constants ***/
 const uint32_t RAW_BUFFER_SIZE = 409600;
@@ -141,6 +141,8 @@ class FT232H
      */
     void setSamplingRate(int rate);
 
+    void setHighPassFilter(bool on);
+
     /* Specifies number of channels to use */
     void setChannelNum(int n);
 
@@ -230,7 +232,7 @@ class FT232H
     /*** Functions managing receive buffer ***/
 
     /* Reads in available data and adds it to the dataBuffer */
-    void read();
+    void readBuffer();
 
     /* Reads in the requested amount of data within the time frame,
      * or else times out */
@@ -241,7 +243,7 @@ class FT232H
     bool formatSample();
 
     /* Throw away all samples until the next change in LRCK */
-    void alignToNextLRCK(uint8_t LRCK);
+    void alignToNextLRCK(uint8_t LRCK, uint8_t limit);
 
 
     /*** Supporting functions ***/

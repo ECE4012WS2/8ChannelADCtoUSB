@@ -19,13 +19,14 @@ using namespace std;
 
 int main()
 {
-    bool first_run = true;             // get this as a cmd arg later
+    bool first_run = false;             // get this as a cmd arg later
     FT232H ft;
 
     // Configuration parameters
     if(first_run) ft.programEEPROM();
     ft.setChannelNum(8);
-    ft.setCrystalFreq(24576000);
+    //ft.setCrystalFreq(24576000);
+    ft.setCrystalFreq(27460000);
     ft.setSocketType("TCP");
 
     // Initialize ADC and to start sampling
@@ -33,10 +34,11 @@ int main()
 
     // Setting sampling rate, which must be followed by buffer clear
     //ft.setSamplingRate(96000);
+    //ft.setHighPassFilter(false);
     ft.clear();
     
     // Read 200 samples into buffer
-    
+
     ft.connect("192.168.1.101", 5555);
 	std::cout <<"Starting streaming" << std::endl;
     while(true){
@@ -53,4 +55,3 @@ int main()
 
     return 0;
 }
-

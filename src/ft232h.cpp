@@ -16,7 +16,10 @@
 
 using namespace std;
 
+/* debugging variables */
+uint8_t history[64];
 int count = 0;
+uint8_t pole = 0;
 
 /* Table and function used to flip a byte, defined for convenient
  * debugging purposes */
@@ -136,6 +139,13 @@ void FT232H::setSamplingRate(int rate)
     write_SPI(&adc_regs.GCTL.all);
 }
 
+void FT232H::setHighPassFilter(bool on)
+{
+    if(on) adc_regs.HPF = 0x00;
+    else   adc_regs.HPF = 0xFF;
+    write_SPI(&adc_regs.HPF);
+}
+
 void FT232H::setChannelNum(int n)
 {
     channel_num = (uint32_t) n;
@@ -205,7 +215,8 @@ void FT232H::clear()
     blockingRead(64, 5000);
 
     // Align data as odd channels for each sample is clocked out first
-    alignToNextLRCK(0);
+    alignToNextLRCK(1, 32);
+    alignToNextLRCK(0, 32);
 }
 
 void FT232H::buffer(int sample_count)
@@ -213,7 +224,7 @@ void FT232H::buffer(int sample_count)
     // Check that there is enough room
     if((uint32_t)sample_count*64 > RAW_BUFFER_SIZE-64){
         cout << "Error: " << sample_count << " samples requested exceeds "
-             << (int) (RAW_BUFFER_SIZE-64)/64 << " limit.";
+             << (int) (RAW_BUFFER_SIZE/64-1) << " limit.";
         exit(1);
     }
 
@@ -221,10 +232,16 @@ void FT232H::buffer(int sample_count)
     if(channelBuffer[0].getEntries() >= sample_count) return;
     else sample_count -= channelBuffer[0].getEntries();
 
+    //struct timespec start, end;
+
     // Keep reading in data from FT232H buffer in chunks of 500 bytes
     // until there is enough for the requested samples
-    while(dataBuffer.getEntries() < (sample_count*64+64)){
-        blockingRead(500, 5000);
+    while(dataBuffer.getEntries() < (sample_count+1)*64){
+    //clock_gettime(CLOCK_REALTIME, &start);
+        blockingRead(1024, 5000);
+        //readBuffer();
+    //clock_gettime(CLOCK_REALTIME, &end);
+    //cout << "s: " << end.tv_sec-start.tv_sec << " ns: " << end.tv_nsec-start.tv_nsec << endl;
     }
 
 /*
@@ -237,14 +254,11 @@ void FT232H::buffer(int sample_count)
     while(dataBuffer.getNext(entry)){
         file << n << "," << (int)entry << std::endl;
         n++;
-        if(n > 5000){
-            cout << n << endl;
-            break;
-        }
     }
     file.close();
-    exit(1);
 */
+//    exit(1);
+
     // Format samples from raw buffer into channel buffer
     for(int i = 0; i < sample_count*2; i++) formatSample();
 }
@@ -252,12 +266,17 @@ void FT232H::buffer(int sample_count)
 void FT232H::read(int* buf, int samples, int channel)
 {
     // Check that channel exists
-    if((uint32_t)channel > channel_num){
-        cout << "Error: Channel " << channel << " requested when there is only "
-             << channel_num << " channels in use" << endl;
+    if((uint32_t)channel > channel_num && channel < 1){
+        cout << "Error: Channel " << channel << " doesn't exist!" << endl;
         exit(1);
     }
-    
+
+    // Check that there is enough samples in buffer
+    if(channelBuffer[channel-1].getEntries() < samples){
+        cout << "Error: trying to read more than available samples" << endl;
+        exit(1);
+    }
+
     // Extract from buffer and clear it
     channelBuffer[channel-1].getN((uint32_t*)buf, samples);
     channelBuffer[channel-1].clearN(samples);
@@ -318,11 +337,7 @@ void FT232H::init_ADC()
     adc_regs.MUTE = 0x00;                   // no muted
     adc_regs.SDEN = 0x00;                   // SDOUT pins enabled
 
-    /*
-    adc_regs.HPF = 0xFF;
-    write_SPI(&adc_regs.HPF);
-*/
-    CSn_CL = 1;             // 
+    CSn_CL = 1;             //
 }
 
 void FT232H::open()
@@ -390,7 +405,7 @@ void FT232H::close()
     errCheck("FT_Close failed");
 }
 
-void FT232H::read()
+void FT232H::readBuffer()
 {
     // Get the number bytes currently in FT232H's buffer
     ftStatus = FT_GetQueueStatus(ftHandle, &RxBytes);
@@ -404,21 +419,22 @@ void FT232H::read()
         errCheck("FT_Read failed");
 
         if(RxBytes != BytesReceived){
-            cout << "Bytes read mis-match" << endl;
-            exit(0);
+            //cout << "Bytes read mis-match" << endl;
         }
+        dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
     }
-
-    dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
 }
 
 DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout)
 {
+<<<<<<< HEAD
 
 #ifdef DEBUG_PRINT
 //    cout << "Reading " << (int) bytes << " bytes of data (blocking)" << endl;
 #endif
 
+=======
+>>>>>>> 29a403b90c4b5e1515809e92322648e43fc8d0b2
     ftStatus = FT_SetTimeouts(ftHandle, timeout, 1000);
     errCheck("FT_SetTimeouts");
     ftStatus = FT_Read(ftHandle, RxBuffer, bytes, &BytesReceived);
@@ -428,17 +444,26 @@ DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout)
         exit(0);
     }
 
-/******************************************************************************************
- * MSIO0 is MSB apparently, temporary flip in software, re-wire hardware in final design
- ******************************************************************************************/
-/*
-for(DWORD i = 0; i < BytesReceived; i++){
-    RxBuffer[i] = flip(RxBuffer[i]);
-}
-*/
-/******************************************************************************************/
+    /*
+    for(uint32_t i = 0; i < BytesReceived; i++){
+        if((RxBuffer[i] & 0x01) == pole){
+            count++;
+            if(count > 32){
+                cout << "ERROR from received buffer! Over 32 clocks for one sample!" << endl;
+            }
+        }else{
+            count = 0;
+            pole = RxBuffer[i] & 0x01;
+        }
+    }
+    */
 
     dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
+
+#ifdef DEBUG_PRINT
+    cout << (int) BytesReceived << " bytes of data read (blocking)" << endl;
+#endif
+
     return BytesReceived;
 }
 
@@ -449,6 +474,9 @@ bool FT232H::formatSample()
         return false;
     }
 
+// Save next 64 entries for debugging in case over 32 clocks seen for one sample
+//dataBuffer.getN(history, 64);
+
     uint8_t entry;
     // Peek into first entry for the LRCK bit, which is high in LJ mode
     // when the channel is odd
@@ -456,7 +484,7 @@ bool FT232H::formatSample()
     uint8_t LRCK = entry & 1;
 
     uint32_t i0, i1, i2, i3;
-    // Add a new entry for the even or odd channels, depending on LRCK 
+    // Add a new entry for the even or odd channels, depending on LRCK
     // and how many channels needed
     if(channel_num >= (uint32_t)(2-LRCK)) i0 = channelBuffer[1-LRCK].add(0);
     if(channel_num >= (uint32_t)(4-LRCK)) i1 = channelBuffer[3-LRCK].add(0);
@@ -480,7 +508,7 @@ bool FT232H::formatSample()
     }
 
     // Skip extra bits to the next LRCK
-    alignToNextLRCK(LRCK);
+    alignToNextLRCK(LRCK, 8);
 
     return true;
 }
@@ -488,19 +516,30 @@ bool FT232H::formatSample()
 /* Aligns buffer to the next set of channels different from the given LRCK.
  * If no valid LRCK (0 or 1) is given, the LRCK of the first entry in the
  * buffer is used */
-void FT232H::alignToNextLRCK(uint8_t LRCK)
+void FT232H::alignToNextLRCK(uint8_t LRCK, uint8_t limit)
 {
     uint8_t entry;
     int i = 0;
+<<<<<<< HEAD
     dataBuffer.getN(&entry, 1);
     //if(LRCK > 1) LRCK = entry & 1;
     while((entry&1) == LRCK){               // Check if LRCK is still the same
+=======
+    // Get next entry and check if LRCK is still the same
+    while(dataBuffer.getN(&entry, 1) && (entry&1) == LRCK){
+>>>>>>> 29a403b90c4b5e1515809e92322648e43fc8d0b2
         //dataBuffer.pop(&entry);
         dataBuffer.clearN(1);               // Get rid of it
-        dataBuffer.getN(&entry, 1);         // Grab the next entry
         i++;
+<<<<<<< HEAD
         if(i > 8){
 //            cout << "Error: Over 32 clock cycles seen for one sample!" << endl;
+=======
+        if(i > limit){
+            cout << "Warning: Over 32 clock cycles seen for one sample!"
+                 << "Possible buffer overflow on FT232H device" << endl;
+//            for(int i = 0; i < 64; i++) cout << (int) history[i] << endl;
+>>>>>>> 29a403b90c4b5e1515809e92322648e43fc8d0b2
 //            exit(1);
         }
     }
@@ -611,10 +650,10 @@ void FT232H::programEEPROM()
 
     // Cbus mux settings
     Data.Cbus4H = FT_232H_CBUS_TXRXLED;
-    Data.Cbus5H = FT_232H_CBUS_IOMODE;      // 
-    Data.Cbus6H = FT_232H_CBUS_IOMODE;      // 
-    Data.Cbus8H = FT_232H_CBUS_IOMODE;      // 
-    Data.Cbus9H = FT_232H_CBUS_IOMODE;      // 
+    Data.Cbus5H = FT_232H_CBUS_IOMODE;      //
+    Data.Cbus6H = FT_232H_CBUS_IOMODE;      //
+    Data.Cbus8H = FT_232H_CBUS_IOMODE;      //
+    Data.Cbus9H = FT_232H_CBUS_IOMODE;      //
 
     // FT1248 Settings
     Data.IsFT1248H = 1;                     // FT1248 enable
@@ -718,4 +757,3 @@ uint8_t ACBUS_out::operator!() const
 {
     return !value;
 }
-
