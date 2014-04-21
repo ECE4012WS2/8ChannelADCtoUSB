@@ -22,7 +22,6 @@ void sendOverSocket();
 
 int main()
 {
-  sendOverSocket();
     bool first_run = false;             // get this as a cmd arg later
     FT232H ft;
 
