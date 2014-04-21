@@ -18,7 +18,10 @@
 
 using namespace std;
 
+/* debugging variables */
+uint8_t history[64];
 int count = 0;
+uint8_t pole = 0;
 
 /* Table and function used to flip a byte, defined for convenient
  * debugging purposes */
@@ -138,6 +141,13 @@ void FT232H::setSamplingRate(int rate)
     write_SPI(&adc_regs.GCTL.all);
 }
 
+void FT232H::setHighPassFilter(bool on)
+{
+    if(on) adc_regs.HPF = 0x00;
+    else   adc_regs.HPF = 0xFF;
+    write_SPI(&adc_regs.HPF);
+}
+
 void FT232H::setChannelNum(int n)
 {
     channel_num = (uint32_t) n;
@@ -222,16 +232,17 @@ void FT232H::buffer(int sample_count)
     if(channelBuffer[0].getEntries() >= sample_count) return;
     else sample_count -= channelBuffer[0].getEntries();
 
-//    struct timespec start, end;
+    //struct timespec start, end;
 
     // Keep reading in data from FT232H buffer in chunks of 500 bytes
     // until there is enough for the requested samples
-//    clock_gettime(CLOCK_REALTIME, &start);
     while(dataBuffer.getEntries() < (sample_count+1)*64){
-        blockingRead(640, 5000);
+    //clock_gettime(CLOCK_REALTIME, &start);
+        blockingRead(1024, 5000);
+        //readBuffer();
+    //clock_gettime(CLOCK_REALTIME, &end);
+    //cout << "s: " << end.tv_sec-start.tv_sec << " ns: " << end.tv_nsec-start.tv_nsec << endl;
     }
-//    clock_gettime(CLOCK_REALTIME, &end);
-//    cout << "s: " << end.tv_sec-start.tv_sec << " ns: " << end.tv_nsec-start.tv_nsec << endl;
 
 /*
     ofstream file;
@@ -262,7 +273,6 @@ void FT232H::read(int* buf, int samples, int channel)
 
     // Check that there is enough samples in buffer
     if(channelBuffer[channel-1].getEntries() < samples){
-cout << channel << " " << channelBuffer[channel-1].getEntries() << " " << samples << endl;
         cout << "Error: trying to read more than available samples" << endl;
         exit(1);
     }
@@ -315,9 +325,9 @@ void FT232H::init_ADC()
     // Set Global Control Register and write to ADC with SPI
     adc_regs.GCTL.bit.CP_EN = 0x1;          // enable control port mode
     adc_regs.GCTL.bit.CLKMODE = 0x0;        // no divide by 1.5
-    adc_regs.GCTL.bit.MDIV = 0x2;           // divide by 2
+    adc_regs.GCTL.bit.MDIV = 0x1;           // divide by 2
     adc_regs.GCTL.bit.DIF = 0x0;            // left justified mode
-    adc_regs.GCTL.bit.MODE = 0x1;           // quadruple-speed mode
+    adc_regs.GCTL.bit.MODE = 0x2;           // quadruple-speed mode
     write_SPI(&adc_regs.GCTL.all);          // write to ADC
 
     // Initialize other register values to default ADC values
@@ -327,10 +337,6 @@ void FT232H::init_ADC()
     adc_regs.MUTE = 0x00;                   // no muted
     adc_regs.SDEN = 0x00;                   // SDOUT pins enabled
 
-    /*
-    adc_regs.HPF = 0xFF;
-    write_SPI(&adc_regs.HPF);
-*/
     CSn_CL = 1;             // 
 }
 
@@ -399,7 +405,7 @@ void FT232H::close()
     errCheck("FT_Close failed");
 }
 
-void FT232H::read()
+void FT232H::readBuffer()
 {
     // Get the number bytes currently in FT232H's buffer
     ftStatus = FT_GetQueueStatus(ftHandle, &RxBytes);
@@ -413,12 +419,10 @@ void FT232H::read()
         errCheck("FT_Read failed");
 
         if(RxBytes != BytesReceived){
-            cout << "Bytes read mis-match" << endl;
-            exit(0);
+            //cout << "Bytes read mis-match" << endl;
         }
+        dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
     }
-
-    dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
 }
 
 DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout)
@@ -431,6 +435,20 @@ DWORD FT232H::blockingRead(DWORD bytes, DWORD timeout)
         cout << "Timed out in blockingRead" << endl;
         exit(0);
     }
+
+    /*
+    for(uint32_t i = 0; i < BytesReceived; i++){
+        if((RxBuffer[i] & 0x01) == pole){
+            count++;
+            if(count > 32){
+                cout << "ERROR from received buffer! Over 32 clocks for one sample!" << endl;
+            }
+        }else{
+            count = 0;
+            pole = RxBuffer[i] & 0x01;
+        }
+    }
+    */
 
     dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
 
@@ -447,6 +465,9 @@ bool FT232H::formatSample()
     if(dataBuffer.getEntries() < 100){
         return false;
     }
+
+// Save next 64 entries for debugging in case over 32 clocks seen for one sample
+//dataBuffer.getN(history, 64);
 
     uint8_t entry;
     // Peek into first entry for the LRCK bit, which is high in LJ mode
@@ -466,7 +487,6 @@ bool FT232H::formatSample()
     // position of each channel sample buffer
     for(int i = 0; i < 24; i++){
         dataBuffer.getN(&entry, 1);                 // Get one entry
-//cout << "format: " << (int) entry << endl;
         if(LRCK != (entry&1)) return true;
         if(channel_num >= (uint32_t)(2-LRCK))
             channelBuffer[1-LRCK][i0] |= ((uint32_t) ((entry&2)>>1) << (23-i));
@@ -492,17 +512,16 @@ void FT232H::alignToNextLRCK(uint8_t LRCK, uint8_t limit)
 {
     uint8_t entry;
     int i = 0;
-    dataBuffer.getN(&entry, 1);
-    //if(LRCK > 1) LRCK = entry & 1;
-    while((entry&1) == LRCK){               // Check if LRCK is still the same
-//cout << "align: " << (int) entry << endl;
+    // Get next entry and check if LRCK is still the same
+    while(dataBuffer.getN(&entry, 1) && (entry&1) == LRCK){
         //dataBuffer.pop(&entry);
         dataBuffer.clearN(1);               // Get rid of it
-        dataBuffer.getN(&entry, 1);         // Grab the next entry
         i++;
         if(i > limit){
-            cout << "Error: Over 32 clock cycles seen for one sample!" << endl;
-            //exit(1);
+            cout << "Warning: Over 32 clock cycles seen for one sample!"
+                 << "Possible buffer overflow on FT232H device" << endl;
+//            for(int i = 0; i < 64; i++) cout << (int) history[i] << endl;
+//            exit(1);
         }
     }
 }

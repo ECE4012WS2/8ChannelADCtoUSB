@@ -141,6 +141,8 @@ class FT232H
      */
     void setSamplingRate(int rate);
 
+    void setHighPassFilter(bool on);
+
     /* Specifies number of channels to use */
     void setChannelNum(int n);
 
@@ -230,7 +232,7 @@ class FT232H
     /*** Functions managing receive buffer ***/
 
     /* Reads in available data and adds it to the dataBuffer */
-    void read();
+    void readBuffer();
 
     /* Reads in the requested amount of data within the time frame,
      * or else times out */

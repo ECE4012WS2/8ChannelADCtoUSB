@@ -34,22 +34,10 @@ int main()
 
     // Setting sampling rate, which must be followed by buffer clear
     //ft.setSamplingRate(96000);
+    //ft.setHighPassFilter(false);
     ft.clear();
     
-    // Read 200 samples into buffer
-    //ft.buffer(1000);
-
-    
-    int buff[1000];
-    for(int i = 0; i < 100; i++){
-        ft.buffer(1000);
-        for(int j = 1; j <= 8; j++){
-            ft.read(buff, 1000, j);
-        }
-    }
-    
-    //for(int i = 0; i < 1000; i++) cout << buff[i] << endl;
-        ft.buffer(1000);
+    ft.buffer(5000);
 
 /*
     // Copy samples for channel 1 to array
