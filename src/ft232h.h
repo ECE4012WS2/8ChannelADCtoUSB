@@ -198,13 +198,6 @@ class FT232H
     uint32_t port;
     uint32_t channel_num;                // number of adc channels, 8 default
 
-    // Buffer and variables for storing results of each read
-    uint8_t RxBuffer[1024];         // buffer size on FT232H is 1k bytes
-    DWORD RxBytes;
-    DWORD BytesReceived;
-
-    // Buffer containing all recently read raw data
-    CircularBuffer<uint8_t> dataBuffer;
     // Buffers for formatted data for each channel
     CircularBuffer<uint32_t> channelBuffer[8];
 
@@ -231,19 +224,12 @@ class FT232H
 
     /*** Functions managing receive buffer ***/
 
-    /* Reads in available data and adds it to the dataBuffer */
-    void readBuffer();
-
-    /* Reads in the requested amount of data within the time frame,
-     * or else times out */
-    DWORD blockingRead(DWORD bytes);
-
     /* Formats a single sample for 4 channels from the global raw data
      * buffer and stores it into its respective buffer */
-    bool formatSample();
+    void formatSamples(uint8_t* buf, uint32_t size);
 
     /* Throw away all samples until the next change in LRCK */
-    void alignToNextLRCK(uint8_t LRCK, uint8_t limit);
+    uint8_t* alignToNextLRCK(uint8_t* buf, uint8_t LRCK, uint8_t limit);
 
 
     /*** Supporting functions ***/

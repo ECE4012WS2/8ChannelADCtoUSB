@@ -36,11 +36,12 @@ int main()
     ft.init_ADC();
 
     // Setting sampling rate, which must be followed by buffer clear
+    //ft.setSamplingRate(143020);
+    //ft.setSamplingRate(214531);
     ft.setSamplingRate(107265);
-    //ft.setHighPassFilter(false);
-    ft.clear();
+    //ft.setHighPassFilter(true);
 
-    ft.buffer(5000);
+    ft.buffer(3000);
 
 /*
     // Copy samples for channel 1 to array
@@ -48,7 +49,7 @@ int main()
     ft.read(channel1, 200, 1);
 */
     ft.writeBuf2File();
-    sendOverSocket();
+//    sendOverSocket();
     return 0;
 }
 
@@ -62,7 +63,7 @@ void sendOverSocket(){
   std::stringstream strstream;
   string filename;
   while(++numFiles < 9){
-    TCPSocket s("192.168.1.6",3000,0,true);
+    TCPSocket s("192.168.1.101",3000,0,true);
 
     strstream << "channel" << numFiles << ".csv";
     filename = strstream.str();
