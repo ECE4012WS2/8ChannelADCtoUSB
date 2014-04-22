@@ -37,9 +37,13 @@ int main()
 
     // Setting sampling rate, which must be followed by buffer clear
     ft.setSamplingRate(107265);
+    //ft.setSamplingRate(214530);
     //ft.setHighPassFilter(false);
     ft.clear();
 
+    // This will buffer at least the number of samples requested into
+    // channel buffers. Memory is allocated dynamically and previous
+    // data in the buffers will be cleared.
     ft.buffer(5000);
 
 /*
@@ -48,7 +52,10 @@ int main()
     ft.read(channel1, 200, 1);
 */
     ft.writeBuf2File();
-    sendOverSocket();
+
+    ft.clear();     // clear to channel buffers to free up memory
+
+    //sendOverSocket();
     return 0;
 }
 

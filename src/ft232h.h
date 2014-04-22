@@ -32,9 +32,16 @@
 #define DEBUG_PRINT             // define this for stdout status
 
 /*** Global constants ***/
-const uint32_t RAW_BUFFER_SIZE = 409600;
-const uint32_t CHANNEL_BUFFER_SIZE = 6400;
-const uint32_t SPI_WAIT = 10000;                // us wait between clock switches
+
+// This is the number of bytes to read from the ft232h device
+// before processing the data into samples. The maximum needs to
+// be a little less than 256k bytes. If this number is too high
+// on slower machines, the processing time may take too long
+// before reading data again, causing buffer overflow
+const uint32_t BYTES_TO_BUFFER = 50000;
+
+// Used for controlling the time between clock switches in SPI
+const uint32_t SPI_WAIT = 10000;
 
 class FT232H;                   // declare class existance
 
@@ -199,7 +206,7 @@ class FT232H
     uint32_t channel_num;                // number of adc channels, 8 default
 
     // Buffer and variables for storing results of each read
-    uint8_t RxBuffer[1024];         // buffer size on FT232H is 1k bytes
+    uint8_t RxBuffer[262144];       // FT_Read can handle max of 256k bytes
     DWORD RxBytes;
     DWORD BytesReceived;
 

@@ -67,10 +67,7 @@ FT232H::FT232H()
 
     // Initialize buffers
     for(uint32_t i = 0; i < 1024; i++) RxBuffer[i] = 0;
-    dataBuffer.setSize(RAW_BUFFER_SIZE);
-    for(uint32_t i = 0; i < 8; i ++){
-        channelBuffer[i].setSize(CHANNEL_BUFFER_SIZE);
-    }
+    dataBuffer.setSize(265000);
 
     // Set register address map for ADC
     CHIP_ADDRESS = 0x9E;            // ADC chip address with write bit
@@ -226,65 +223,42 @@ void FT232H::clear()
     // Clear raw data buffer and channel buffers
     dataBuffer.clearN(dataBuffer.getEntries());
     for(int i = 0; i < 8; i++){
-        channelBuffer[i].clearN(channelBuffer[i].getEntries());
+        channelBuffer[i].setSize(0);
     }
 
     // Clear buffers on ft232h
     purge();
-
-    // Read in a little data
-    blockingRead(64);
-
-    // Align data as odd channels for each sample is clocked out first
-    alignToNextLRCK(1, 32);
-    alignToNextLRCK(0, 32);
 }
 
 void FT232H::buffer(int sample_count)
 {
-    // Check that there is enough room
-    if((uint32_t)sample_count*64 > RAW_BUFFER_SIZE-64){
-        cout << "Error: " << sample_count << " samples requested exceeds "
-             << (int) (RAW_BUFFER_SIZE/64-1) << " limit.";
-        exit(1);
+    // Clear data buffer and allocate space for channel buffers
+    dataBuffer.clearN(dataBuffer.getEntries());
+    for(uint32_t i = 0; i < channel_num; i++){
+        channelBuffer[i].setSize(sample_count + BYTES_TO_BUFFER/64);
     }
-
-    // Find out how many more samples are needed
-    if(channelBuffer[0].getEntries() >= sample_count) return;
-    else sample_count -= channelBuffer[0].getEntries();
-
 
 #ifdef DEBUG_PRINT
     cout << "Buffering " << sample_count << " samples...";
 #endif
 
-    // Keep reading in data from FT232H buffer in chunks of 1k bytes
-    // until there is enough for the requested samples
-    while(dataBuffer.getEntries() < (sample_count+1)*64){
-        blockingRead(1024);
+    // Align data on the first buffer read as odd channels for each
+    // sample is clocked out first
+    blockingRead(BYTES_TO_BUFFER);
+    alignToNextLRCK(1, 32);
+    alignToNextLRCK(0, 32);
+    while(formatSample()) {}
+
+    // Continue to read data in specified chunks and process them
+    // into samples until the desired sample count is reached
+    while(channelBuffer[0].getEntries() < sample_count){
+        blockingRead(BYTES_TO_BUFFER);
+        while(formatSample()) {}
     }
 
 #ifdef DEBUG_PRINT
     cout << "Done" << endl;
 #endif
-
-/*
-    ofstream file;
-    uint8_t entry;
-    uint32_t n;
-    file.open("dataBuffer.csv");
-    dataBuffer.reset();
-    n = 0;
-    while(dataBuffer.getNext(entry)){
-        file << n << "," << (int)entry << std::endl;
-        n++;
-    }
-    file.close();
-*/
-//    exit(1);
-
-    // Format samples from raw buffer into channel buffer
-    for(int i = 0; i < sample_count*2; i++) formatSample();
 }
 
 void FT232H::read(int* buf, int samples, int channel)
@@ -484,20 +458,6 @@ DWORD FT232H::blockingRead(DWORD bytes)
         exit(0);
     }
 
-    /*
-    for(uint32_t i = 0; i < BytesReceived; i++){
-        if((RxBuffer[i] & 0x01) == pole){
-            count++;
-            if(count > 32){
-                cout << "ERROR from received buffer! Over 32 clocks for one sample!" << endl;
-            }
-        }else{
-            count = 0;
-            pole = RxBuffer[i] & 0x01;
-        }
-    }
-    */
-
     dataBuffer.addN(RxBuffer, (uint32_t) BytesReceived);
     return BytesReceived;
 }
@@ -505,9 +465,7 @@ DWORD FT232H::blockingRead(DWORD bytes)
 bool FT232H::formatSample()
 {
     // Make sure enough data is in buffer
-    if(dataBuffer.getEntries() < 100){
-        return false;
-    }
+    if(dataBuffer.getEntries() < 50) return false;
 
 // Save next 64 entries for debugging in case over 32 clocks seen for one sample
 //dataBuffer.getN(history, 64);
@@ -561,10 +519,7 @@ void FT232H::alignToNextLRCK(uint8_t LRCK, uint8_t limit)
         dataBuffer.clearN(1);               // Get rid of it
         i++;
         if(i > limit){
-//            cout << "Warning: Over 32 clock cycles seen for one sample!"
-//                 << "Possible buffer overflow on FT232H device" << endl;
-//            for(int i = 0; i < 64; i++) cout << (int) history[i] << endl;
-//            exit(1);
+//            cout << "Warning: Over 32 clock cycles seen for one sample!" << endl;
         }
     }
 }
@@ -578,16 +533,6 @@ void FT232H::write_SPI(uint8_t* reg)
     // Initialize select and clock lines high
     CSn_CL.set(1);
     CCLK = 1;
-
-/*
-    cout << "Press c to continue" << endl;
-    int c;
-    do {
-         c=getchar();
-         putchar (c);
-    } while (c != 'c');
-    cout << endl;
-*/
 
     usleep(clock_wait);
 

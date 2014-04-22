@@ -84,6 +84,7 @@ public:
 		if (buffer != NULL)
 			delete[] buffer;
 		buffer = new T[size];
+		head = entries = current = 0;
 	}
 	void reset() {
 		current = 0;
