@@ -11,22 +11,18 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <string>
-#include "Sample.h"
 #include <deque>
 #include <vector>
 
 class Socket
 	{
 	public:
-		Socket(const std::string& hostname, const int32_t& port,
-				const size_t &numberSamples);
+		Socket(const std::string& hostname, const int32_t& port);
 		virtual ~Socket();
 		virtual int32_t send(const void* sendbuff, size_t length) = 0;
-		int32_t send(const std::vector<Sample> elements);
         virtual int32_t close();
 		virtual int32_t recv() = 0;
 		bool isOpen() const;
-		Sample getData();
 		int32_t getSock() const;
 		size_t size() const;
 		void setSize(size_t size);
@@ -42,7 +38,6 @@ class Socket
 		int32_t m_sockfd;
 		struct sockaddr_in m_servaddr;
 		int m_type;
-		std::deque<Sample> m_samples;
 		bool m_block;
 		void setOpen(bool value);
 		virtual int32_t open() = 0;

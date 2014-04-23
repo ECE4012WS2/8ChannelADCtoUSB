@@ -16,9 +16,7 @@ def get_files():
   while(numFiles < 9):
     sc, address = s.accept()
     f = open('channel'+ str(numFiles)+".csv",'w')
-    i=1
 
-    i=i+1
     l = sc.recv(1024)
     while (l):
             f.write(l)
@@ -57,7 +55,7 @@ def read_datafile(file_name,plotnum):
 
 fig = plt.figure()
 
-get_files();
+get_files()
 
 
 data = read_datafile('./channel1.csv',1)

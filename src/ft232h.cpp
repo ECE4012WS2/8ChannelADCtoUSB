@@ -15,6 +15,7 @@
 #include <unistd.h>             // usleep
 
 #include "time.h"
+#include <string.h>
 
 //#define TIME_LOG
 
@@ -24,6 +25,8 @@ using namespace std;
 uint8_t history[64];
 int count = 0;
 uint8_t pole = 0;
+
+
 
 /* Table and function used to flip a byte, defined for convenient
  * debugging purposes */
@@ -85,7 +88,7 @@ FT232H::FT232H()
 
 FT232H::~FT232H()
 {
-    if(socket) delete[] socket;
+    if(socket) delete socket;
     close();
 }
 
@@ -183,9 +186,10 @@ void FT232H::connect(string ip, int port)
         exit(1);
     }
     if(socket_type == 1){
-        socket = new TCPSocket(ip, port, 100, true);
+        socket = new TCPSocket(ip, port, true);
     }else if(socket_type == 0){
-        socket = new UDPSocket(ip, port, 100, true);
+      cout <<"Error: UDP NOT IMPLEMENTED" << endl;
+      exit(1);
     }
 }
 
@@ -193,6 +197,41 @@ void FT232H::disconnect()
 {
     delete[] socket;
     socket = NULL;
+}
+
+void FT232H::send(){
+// if(LRCK != (entry&1)) return true;
+// if(channel_num >= (uint32_t)(2-LRCK))
+    // channelBuffer[1-LRCK][i0] |= ((uint32_t) ((entry&2)>>1) << (23-i));
+// if(channel_num >= (uint32_t)(4-LRCK))
+    // channelBuffer[3-LRCK][i1] |= ((uint32_t) ((entry&4)>>2) << (23-i));
+// if(channel_num >= (uint32_t)(6-LRCK))
+    // channelBuffer[5-LRCK][i2] |= ((uint32_t) ((entry&8)>>3) << (23-i));
+// if(channel_num >= (uint32_t)(8-LRCK))
+    // channelBuffer[7-LRCK][i3] |= ((uint32_t) ((entry&16)>>4) << (23-i));
+// dataBuffer.clearN(1);
+          //getN then clearN
+          header_t header;
+          uint8_t currentChannel = 0;
+          uint32_t numEntries;
+
+          if(socket){
+            //Socket is not null
+            //Send 8 bytes with channelnum,size
+            do{
+              header.currentChannel = currentChannel;
+              numEntries = channelBuffer[currentChannel].getEntries();
+              header.size = numEntries;
+              socket->send(&header,sizeof(header_t));
+
+              channelBuffer[currentChannel].getN(socketBuffer,numEntries);
+              socket->send(socketBuffer,numEntries * sizeof(uint32_t));
+
+            }
+            while(++currentChannel < channel_num);
+
+
+          }
 }
 
 void FT232H::send(int sample_count)
@@ -253,7 +292,17 @@ void FT232H::buffer(int sample_count)
     // into samples until the desired sample count is reached
     while(channelBuffer[0].getEntries() < sample_count){
         blockingRead(BYTES_TO_BUFFER);
+
+        //Format each sample, one at a time, until no more are left
         while(formatSample()) {}
+        //Socket here
+        this->send();
+        /*
+
+        Check channel numbers
+        channelBuf[0].getN(buf,channelBuf[0].getEntries())
+
+        */
     }
 
 #ifdef DEBUG_PRINT
@@ -274,7 +323,7 @@ void FT232H::read(int* buf, int samples, int channel)
         cout << "Error: trying to read more than available samples" << endl;
         exit(1);
     }
-    
+
     // Extract from buffer and clear it
     channelBuffer[channel-1].getN((uint32_t*)buf, samples);
     channelBuffer[channel-1].clearN(samples);
@@ -282,9 +331,9 @@ void FT232H::read(int* buf, int samples, int channel)
 
 void FT232H::setSocketType(std::string type)
 {
-    if(type.compare("UDP")){
+    if(!type.compare("UDP")){
         socket_type = 0;
-    }else if(type.compare("TCP")){
+    }else if(!type.compare("TCP")){
         socket_type = 1;
     }else{
         cout << "Error: socket type not recognized. Options are:"
@@ -335,7 +384,7 @@ void FT232H::init_ADC()
     adc_regs.MUTE = 0x00;                   // no muted
     adc_regs.SDEN = 0x00;                   // SDOUT pins enabled
 
-    CSn_CL = 1;             // 
+    CSn_CL = 1;             //
 }
 
 void FT232H::open()
@@ -477,7 +526,7 @@ bool FT232H::formatSample()
     uint8_t LRCK = entry & 1;
 
     uint32_t i0, i1, i2, i3;
-    // Add a new entry for the even or odd channels, depending on LRCK 
+    // Add a new entry for the even or odd channels, depending on LRCK
     // and how many channels needed
     if(channel_num >= (uint32_t)(2-LRCK)) i0 = channelBuffer[1-LRCK].add(0);
     if(channel_num >= (uint32_t)(4-LRCK)) i1 = channelBuffer[3-LRCK].add(0);
@@ -619,10 +668,10 @@ void FT232H::programEEPROM()
 
     // Cbus mux settings
     Data.Cbus4H = FT_232H_CBUS_TXRXLED;
-    Data.Cbus5H = FT_232H_CBUS_IOMODE;      // 
-    Data.Cbus6H = FT_232H_CBUS_IOMODE;      // 
-    Data.Cbus8H = FT_232H_CBUS_IOMODE;      // 
-    Data.Cbus9H = FT_232H_CBUS_IOMODE;      // 
+    Data.Cbus5H = FT_232H_CBUS_IOMODE;      //
+    Data.Cbus6H = FT_232H_CBUS_IOMODE;      //
+    Data.Cbus8H = FT_232H_CBUS_IOMODE;      //
+    Data.Cbus9H = FT_232H_CBUS_IOMODE;      //
 
     // FT1248 Settings
     Data.IsFT1248H = 1;                     // FT1248 enable
@@ -726,4 +775,3 @@ uint8_t ACBUS_out::operator!() const
 {
     return !value;
 }
-

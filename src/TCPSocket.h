@@ -13,8 +13,7 @@
 class TCPSocket: public Socket
 	{
 	public:
-		TCPSocket(const std::string& newHostname, const int32_t& newPort,
-				const size_t& buffSize, const bool client = true);
+		TCPSocket(const std::string& newHostname, const int32_t& newPort, const bool client = true);
 		virtual ~TCPSocket();
 		int32_t send(const void* sendbuff, size_t length);
 		int32_t recv();

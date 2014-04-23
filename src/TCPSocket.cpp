@@ -18,43 +18,43 @@
 #include <errno.h>
 #include <unistd.h>
 
-TCPSocket::TCPSocket(const std::string& hostname, const int32_t& port,
-                     const size_t& buffSize, const bool client)
-: Socket(hostname, port, buffSize),m_clilen(-1),m_listenfd(-1), m_isClient(client)
+TCPSocket::TCPSocket(const std::string& hostname, const int32_t& port, const bool client)
+: Socket(hostname, port),m_clilen(-1),m_listenfd(-1), m_isClient(client)
 {
-    
+
     m_type = SOCK_STREAM;
     bzero(&m_cliaddr, sizeof(sockaddr_in));
-    
+
     //Set up the server address
     m_servaddr.sin_family = AF_INET;
     m_servaddr.sin_addr.s_addr = INADDR_ANY;
     m_servaddr.sin_port = htons(m_port);
-    
+
     struct addrinfo hints;
     char portstr[5];
     snprintf(portstr, 5, "%d", m_port);
-    
+
     bzero(&hints, sizeof(struct addrinfo));
-    
+
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_family = PF_UNSPEC;
     rc = getaddrinfo(m_hostname.c_str(), portstr, &hints, &m_res);
     noError("TCPSocket: getaddrinfo");
-    
+
     m_sockfd = socket(m_res->ai_family, m_res->ai_socktype,
                       m_res->ai_protocol);
     noError("TCPSocket: socket()");
-    
+
     int optval = 1;
     rc = setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, &optval,
                     sizeof(optval));
     noError("TCPSocket: setsockopt()");
-    
+
+
     this->open();
     this->enableBlock();
     std::cout << "Created new TCPSocket " << m_hostname << ":" << m_port << std::endl;
-    
+
 }
 
 TCPSocket::~TCPSocket()
@@ -72,7 +72,7 @@ int32_t TCPSocket::send(const void* sendbuff, size_t length)
             bytesSent = ::send(m_sockfd,
                                (char*) sendbuff + sent,
                                length - sent, 0);
-            
+
             if(bytesSent < 0){
                 perror("TCPSocket: Send");
                 return (int32_t) bytesSent;
@@ -81,7 +81,7 @@ int32_t TCPSocket::send(const void* sendbuff, size_t length)
         }
         return (int32_t)sent;
     }
-    
+
     std::cerr << "Socket not opened! " << toString() << std::endl;
     return -1;
 }
@@ -90,10 +90,10 @@ int32_t TCPSocket::recv()
 {
     if (this->isOpen())
     {
-        
+
         fd_set recv_sock;
         struct timeval timeout;
-        
+
         FD_ZERO(&recv_sock);
         FD_SET(m_sockfd, &recv_sock);
         if (!m_block)
@@ -110,9 +110,9 @@ int32_t TCPSocket::recv()
             std::cout <<"Calling \"blocking\" select" << std::endl;
             rc = select(m_sockfd +1 , &recv_sock, NULL, NULL, NULL);
         }
-        
+
 //        noError("TCPSocket: select()");
-        
+
         //Check that we received data
         if (rc > 0)
         {
@@ -127,7 +127,7 @@ int32_t TCPSocket::recv()
             {
                 rc = (int) ::recv(m_sockfd, buff, buffSize, 0);
             }
-            
+
             //Specific error handling so we cant use noErrors()
             if (rc == 0)
             {
@@ -144,12 +144,12 @@ int32_t TCPSocket::recv()
                         perror("TCPSocket: recv");
                         break;
                 }
-                
+
             }
             std::cout << "Recieved: " << buff << std::endl;
             return (int32_t)rc;
         }
-        
+
     }
     return -1;
 }
@@ -160,10 +160,10 @@ void TCPSocket::dontBlock()
     int flags;
     flags = fcntl(m_sockfd, F_GETFL, 0);
     if (!noError("TCPSocket: fcntl: F_GETFL", flags)) return;
-    
+
     rc = fcntl(m_sockfd, F_SETFL, flags | O_NONBLOCK);
     if (!noError("TCPSocket: fcntl: F_SETFL")) return;
-    
+
 }
 
 void TCPSocket::enableBlock()
@@ -172,7 +172,7 @@ void TCPSocket::enableBlock()
     int orig_flags;
     orig_flags = fcntl(m_sockfd, F_GETFL, 0);
     if (!noError("TCPSocket: fcntl: F_GETFL", orig_flags)) return;
-    
+
     rc = fcntl(m_sockfd, F_SETFL, orig_flags | !O_NONBLOCK);
     if (!noError("TCPSocket: fcntl: F_SETFL")) return;
 }
@@ -207,31 +207,31 @@ int32_t TCPSocket::open()
     {
         rc = bind(m_sockfd, m_res->ai_addr, m_res->ai_addrlen);
         noError("TCPSocket: Bind()");
-        
+
         rc = listen(m_sockfd, 5);
         noError("TCPSocket: listen()");
-        
+
         m_clilen = sizeof(m_cliaddr);
-        
+
         fd_set socket_set;
         fd_set working_set;
-        
+
         FD_ZERO(&socket_set);
         FD_SET(m_sockfd, &socket_set);
-        
+
         timeval origtime;
         timeval modtime;
         bzero(&origtime, sizeof(timeval));
         bzero(&modtime, sizeof(timeval));
         origtime.tv_sec = 1;
-        
+
         unsigned int numTimeouts = 0;
         while (1)
         {
             modtime.tv_sec = origtime.tv_sec; //reset the timer
-            
+
             memcpy(&working_set, &socket_set, sizeof(fd_set)); //copy the socket set
-            
+
             rc = select(m_sockfd + 1, &working_set, NULL, NULL,
                         &modtime);
             noError("TCPSocket: select()");
@@ -262,6 +262,6 @@ int32_t TCPSocket::open()
     }
     freeaddrinfo(m_res);
     this->setOpen(true);
-    
+
     return (int)rc;
 }

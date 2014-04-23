@@ -27,7 +27,6 @@
 /*** Other supporting headers ***/
 #include "buffer.h"             // managing buffer
 #include "TCPSocket.h"
-#include "UDPSocket.h"
 
 #define DEBUG_PRINT             // define this for stdout status
 
@@ -43,8 +42,14 @@ const uint32_t BYTES_TO_BUFFER = 50000;
 // Used for controlling the time between clock switches in SPI
 const uint32_t SPI_WAIT = 10000;
 
+
+
 class FT232H;                   // declare class existance
 
+typedef struct{
+  uint32_t currentChannel;
+  uint32_t size;
+} header_t;
 
 /*** CS5368 register abstraction layer ***/
 struct GCTL_BITS
@@ -174,6 +179,8 @@ class FT232H
 
     void disconnect();
 
+    void send();
+
     void send(int sample_count);
 
     /* Clears all buffers, should be called before reading/sending data */
@@ -204,7 +211,7 @@ class FT232H
     std::string ip;
     uint32_t port;
     uint32_t channel_num;                // number of adc channels, 8 default
-
+    uint32_t socketBuffer[4096];
     // Buffer and variables for storing results of each read
     uint8_t RxBuffer[262144];       // FT_Read can handle max of 256k bytes
     DWORD RxBytes;
@@ -264,7 +271,7 @@ class FT232H
      */
     void write_SPI(uint8_t* reg);
 
-    /* 
+    /*
      * Used by member functions to check error.
      * Error type and passed in string is printed out and
      * program terminates.
