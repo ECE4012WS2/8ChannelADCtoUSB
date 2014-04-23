@@ -112,11 +112,15 @@ public:
 		return true;
 	}
 	/* Store the first N elements but don't remove from buffer */
-	bool getN(T* buf, int n) {
+	bool getN(T* buf, int n, bool nbo = false) {
 		if (n > entries)
 			return false;
 		for (int i = 0; i < n; i++) {
+      if(nbo){
+        buf[i] = htonl(buffer[(head + i) % size]);
+      }else{
 			buf[i] = buffer[(head + i) % size];
+    }
 		}
 		return true;
 	}

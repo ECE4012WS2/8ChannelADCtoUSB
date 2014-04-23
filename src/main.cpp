@@ -20,24 +20,34 @@ using namespace std;
 
 //void sendOverSocket();
 
+void testSocket(){
+  uint32_t buf[2048];
+  for(int i = 0; i < 2048;++i){
+    buf[i] = i;
+  }
+TCPSocket s("192.168.1.103",3000,true);
+sleep(1);
+ header_t header;
+ header.currentChannel = 0;
+ header.size = 2048;
+ uint32_t bytes[2];
+ bytes[0] = 1;
+ bytes[1] = 2;
+ s.send(&header,sizeof(header_t));
+ // s.send(bytes,sizeof(uint32_t) * 2);
+sleep(2);
+s.close();
+
+     // s.send(buf,2048 * sizeof(uint32_t));
+     // sleep(100000);
+
+ exit(1);
+}
+
 int main()
 {
     bool first_run = false;             // get this as a cmd arg later
-     uint32_t buf[2048];
-     for(int i = 0; i < 2048;++i){
-       buf[i] = i;
-     }
-   TCPSocket s("192.168.1.101",3000,true);
-    header_t header;
-    header.currentChannel = 0;
-    header.size = 2048;
-    char mydata = 0xCC;
-    for(int i = 0;i < 2000;++i)
-      s.send(&mydata,1);
-        // s.send(buf,2048 * sizeof(uint32_t));
-        // sleep(100000);
-        s.close();
-    exit(1);
+    // testSocket();
     FT232H ft;
     // Configuration parameters
     if(first_run) ft.programEEPROM();
@@ -45,7 +55,7 @@ int main()
     //ft.setCrystalFreq(24576000);
     ft.setCrystalFreq(27460000);
     ft.setSocketType("TCP");
-    ft.connect("192.168.1.101",3000);
+    ft.connect("192.168.1.103",3000);
 
     // Initialize ADC and to start sampling
     ft.init_ADC();
@@ -76,6 +86,8 @@ int main()
     // sendOverSocket();
     return 0;
 }
+
+
 
 //void sendOverSocket(){
 //

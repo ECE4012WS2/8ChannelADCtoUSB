@@ -219,12 +219,13 @@ void FT232H::send(){
             //Socket is not null
             //Send 8 bytes with channelnum,size
             do{
-              header.currentChannel = currentChannel;
+              header.currentChannel = htonl(currentChannel);
               numEntries = channelBuffer[currentChannel].getEntries();
-              header.size = numEntries;
+              header.size = htonl(numEntries);
               socket->send(&header,sizeof(header_t));
 
-              channelBuffer[currentChannel].getN(socketBuffer,numEntries);
+              channelBuffer[currentChannel].getN(socketBuffer,numEntries,true);
+
               socket->send(socketBuffer,numEntries * sizeof(uint32_t));
 
             }
@@ -274,7 +275,7 @@ void FT232H::buffer(int sample_count)
     // Clear data buffer and allocate space for channel buffers
     dataBuffer.clearN(dataBuffer.getEntries());
     for(uint32_t i = 0; i < channel_num; i++){
-        channelBuffer[i].setSize(sample_count + BYTES_TO_BUFFER/64);
+        channelBuffer[i].setSize(4500);
     }
 
 #ifdef DEBUG_PRINT
@@ -287,7 +288,7 @@ void FT232H::buffer(int sample_count)
     alignToNextLRCK(1, 32);
     alignToNextLRCK(0, 32);
     while(formatSample()) {}
-
+    this->send();
     // Continue to read data in specified chunks and process them
     // into samples until the desired sample count is reached
     while(channelBuffer[0].getEntries() < sample_count){
@@ -297,13 +298,11 @@ void FT232H::buffer(int sample_count)
         while(formatSample()) {}
         //Socket here
         this->send();
-        /*
-
-        Check channel numbers
-        channelBuf[0].getN(buf,channelBuf[0].getEntries())
-
-        */
+        for(int i = 0; i < channel_num; ++i){
+          channelBuffer[i].clearN(channelBuffer[i].getEntries());
+        }
     }
+
 
 #ifdef DEBUG_PRINT
     cout << "Done" << endl;
