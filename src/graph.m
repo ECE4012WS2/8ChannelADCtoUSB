@@ -1,7 +1,33 @@
 
-system('make');
-system('./project');
+% system('make');
+% system('./project');
+% 
+t = tcpip('0.0.0.0',3000,'NetworkRole','server');
+set(t,'InputBufferSize',120000);
+t
+disp('Waiting for connection')
+fopen(t);
+disp('fopen returned!')
+data = fread(t,1,'char')
+fclose(t);
+t
+return;
+disp('Going into read loop')
+while true
+    channelNum = fread(t,1,'uint32')
+    t
+    size = fread(t,1,'uint32')
+    t
+    arraySize = size;
+    data = fread(t,arraySize,'uint32');
+    t
+end
+data = fscanf(t)
+fclose(t);
+delete(t);
+clear t;
 
+exit;
 
 c1 = dlmread('channel1.csv', ',');
 c2 = dlmread('channel2.csv', ',');
