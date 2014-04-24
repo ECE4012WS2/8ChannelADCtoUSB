@@ -23,6 +23,7 @@
 template<class T>
 class CircularBuffer {
 private:
+public:
 	T* buffer;
 	int size;          // max size of buffer
 	int head;          // location of first element
@@ -86,6 +87,9 @@ public:
 		buffer = new T[size];
 		head = entries = current = 0;
 	}
+    void clearAll(){
+		head = entries = current = 0;
+    }
 	void reset() {
 		current = 0;
 	}
