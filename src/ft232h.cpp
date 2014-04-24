@@ -166,6 +166,12 @@ void FT232H::setHighPassFilter(bool on)
 {
     if(on) adc_regs.HPF = 0x00;
     else   adc_regs.HPF = 0xFF;
+
+#ifdef DEBUG_PRINT
+    if(on) cout << "Turning ON High Pass Filter" << endl;
+    else   cout << "Turning OFF High Pass Filter" << endl;
+#endif
+
     write_SPI(&adc_regs.HPF);
 }
 
@@ -200,62 +206,28 @@ void FT232H::disconnect()
 }
 
 void FT232H::send(){
-// if(LRCK != (entry&1)) return true;
-// if(channel_num >= (uint32_t)(2-LRCK))
-    // channelBuffer[1-LRCK][i0] |= ((uint32_t) ((entry&2)>>1) << (23-i));
-// if(channel_num >= (uint32_t)(4-LRCK))
-    // channelBuffer[3-LRCK][i1] |= ((uint32_t) ((entry&4)>>2) << (23-i));
-// if(channel_num >= (uint32_t)(6-LRCK))
-    // channelBuffer[5-LRCK][i2] |= ((uint32_t) ((entry&8)>>3) << (23-i));
-// if(channel_num >= (uint32_t)(8-LRCK))
-    // channelBuffer[7-LRCK][i3] |= ((uint32_t) ((entry&16)>>4) << (23-i));
-// dataBuffer.clearN(1);
-          //getN then clearN
-          header_t header;
-          uint8_t currentChannel = 0;
-          uint32_t numEntries;
+      header_t header;
+      uint8_t currentChannel = 0;
+      uint32_t numEntries;
 
-          if(socket){
-            //Socket is not null
-            //Send 8 bytes with channelnum,size
-            do{
-              header.currentChannel = htonl(currentChannel);
-              numEntries = channelBuffer[currentChannel].getEntries();
-              header.size = htonl(numEntries);
-              socket->send(&header,sizeof(header_t));
+      if(socket){
+        //Socket is not null
+        //Send 8 bytes with channelnum,size
+        do{
+          header.currentChannel = htonl(currentChannel+1);
+          numEntries = channelBuffer[currentChannel].getEntries();
+          header.size = htonl(numEntries);
+          socket->send(&header,sizeof(header_t));
 
-              channelBuffer[currentChannel].getN(socketBuffer,numEntries,true);
+          channelBuffer[currentChannel].getN(socketBuffer,numEntries,true);
 
-              socket->send(socketBuffer,numEntries * sizeof(uint32_t));
+          socket->send(socketBuffer,numEntries * sizeof(uint32_t));
 
-            }
-            while(++currentChannel < channel_num);
-
-
-          }
-}
-
-void FT232H::send(int sample_count)
-{
-    unsigned char packet[1460];
-    int samples_per_packet = (int) 1460/3/channel_num;
-    int sent = 0;
-    uint32_t sample;
-    int i = 0;
-    while(sent < sample_count){
-        buffer(samples_per_packet);
-        while(i < samples_per_packet){
-            for(uint32_t j = 0; j < channel_num; j++){
-                channelBuffer[j].pop(&sample);
-                packet[i*(channel_num-1)+3*j] = (unsigned char) (sample>>16);
-                packet[i*(channel_num-1)+1+3*j] = (unsigned char) (sample>>8);
-                packet[i*(channel_num-1)+2+3*j] = (unsigned char) sample;
-            }
-            if(++sent == sample_count) break;
-            i++;
         }
-        socket->send(&packet, samples_per_packet*3);
-    }
+        while(++currentChannel < channel_num);
+
+
+      }
 }
 
 void FT232H::clear()
@@ -270,7 +242,7 @@ void FT232H::clear()
     purge();
 }
 
-void FT232H::buffer(int sample_count)
+void FT232H::sendSamples(int sample_count)
 {
     // Clear data buffer and allocate space for channel buffers
     dataBuffer.clearN(dataBuffer.getEntries());
@@ -282,6 +254,8 @@ void FT232H::buffer(int sample_count)
     cout << "Buffering " << sample_count << " samples...";
 #endif
 
+    int samples_sent = 0;
+
     // Align data on the first buffer read as odd channels for each
     // sample is clocked out first
     blockingRead(BYTES_TO_BUFFER);
@@ -291,15 +265,16 @@ void FT232H::buffer(int sample_count)
     this->send();
     // Continue to read data in specified chunks and process them
     // into samples until the desired sample count is reached
-    while(channelBuffer[0].getEntries() < sample_count){
+    while(samples_sent < sample_count){
         blockingRead(BYTES_TO_BUFFER);
 
         //Format each sample, one at a time, until no more are left
-        while(formatSample()) {}
-        //Socket here
+        while(formatSample()) {count++;}
         this->send();
-        for(int i = 0; i < channel_num; ++i){
-          channelBuffer[i].clearN(channelBuffer[i].getEntries());
+        samples_sent += channelBuffer[0].getEntries();
+        for(uint32_t i = 0; i < channel_num; ++i){
+          //channelBuffer[i].clearN(channelBuffer[i].getEntries());
+          channelBuffer[i].clearAll();
         }
     }
 
@@ -307,6 +282,40 @@ void FT232H::buffer(int sample_count)
 #ifdef DEBUG_PRINT
     cout << "Done" << endl;
 #endif
+}
+
+void FT232H::buffer(int sample_count)
+{
+    // Clear data buffer and allocate space for channel buffers
+    dataBuffer.clearN(dataBuffer.getEntries());
+    for(uint32_t i = 0; i < channel_num; i++){
+        channelBuffer[i].setSize(sample_count + BYTES_TO_BUFFER/64 + 5);
+    }
+
+    dataBuffer.setSize((sample_count+100)*64);
+
+#ifdef DEBUG_PRINT
+    cout << "Buffering " << sample_count << " samples...";
+#endif
+
+    // Align data on the first buffer read as odd channels for each
+    // sample is clocked out first
+    blockingRead(BYTES_TO_BUFFER);
+    alignToNextLRCK(1, 32);
+    alignToNextLRCK(0, 32);
+
+    // Continue to read data in specified chunks and process them
+    // into samples until the desired sample count is reached
+    while(dataBuffer.getEntries() < sample_count*64){
+        blockingRead(BYTES_TO_BUFFER);
+    }
+
+#ifdef DEBUG_PRINT
+    cout << "Done" << endl;
+#endif
+
+    //Format each sample, one at a time, until no more are left
+    while(formatSample()) {}
 }
 
 void FT232H::read(int* buf, int samples, int channel)

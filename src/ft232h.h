@@ -25,8 +25,8 @@
 #include "ftd2xx.h"
 
 /*** Other supporting headers ***/
-#include "buffer.h"             // managing buffer
 #include "TCPSocket.h"
+#include "buffer.h"             // managing buffer
 
 #define DEBUG_PRINT             // define this for stdout status
 
@@ -37,7 +37,7 @@
 // be a little less than 256k bytes. If this number is too high
 // on slower machines, the processing time may take too long
 // before reading data again, causing buffer overflow
-const uint32_t BYTES_TO_BUFFER = 50000;
+const uint32_t BYTES_TO_BUFFER = 250000;
 
 // Used for controlling the time between clock switches in SPI
 const uint32_t SPI_WAIT = 10000;
@@ -181,7 +181,7 @@ class FT232H
 
     void send();
 
-    void send(int sample_count);
+    void sendSamples(int sample_count);
 
     /* Clears all buffers, should be called before reading/sending data */
     void clear();

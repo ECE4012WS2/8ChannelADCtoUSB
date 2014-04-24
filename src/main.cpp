@@ -17,115 +17,52 @@
 #include <sstream>
 using namespace std;
 
-
-//void sendOverSocket();
-
-void testSocket(){
-  uint32_t buf[2048];
-  for(int i = 0; i < 2048;++i){
-    buf[i] = i;
-  }
-TCPSocket s("192.168.1.103",3000,true);
-sleep(1);
- header_t header;
- header.currentChannel = 0;
- header.size = 2048;
- uint32_t bytes[2];
- bytes[0] = 1;
- bytes[1] = 2;
- s.send(&header,sizeof(header_t));
- // s.send(bytes,sizeof(uint32_t) * 2);
-sleep(2);
-s.close();
-
-     // s.send(buf,2048 * sizeof(uint32_t));
-     // sleep(100000);
-
- exit(1);
-}
-
 int main()
 {
     bool first_run = false;             // get this as a cmd arg later
+    bool local = false;
     // testSocket();
     FT232H ft;
     // Configuration parameters
     if(first_run) ft.programEEPROM();
     ft.setChannelNum(8);
-    //ft.setCrystalFreq(24576000);
-    ft.setCrystalFreq(27460000);
-    ft.setSocketType("TCP");
-    ft.connect("192.168.1.103",3000);
+    ft.setCrystalFreq(24576000);
+    //ft.setCrystalFreq(27460000);
+    //ft.setSocketType("TCP");
+    
+
+    //if(!local) ft.connect("192.168.1.101",3000);
+    if(!local) ft.connect("127.0.0.1",3000);
 
     // Initialize ADC and to start sampling
     ft.init_ADC();
 
     // Setting sampling rate, which must be followed by buffer clear
-    ft.setSamplingRate(107265);
+    ft.setSamplingRate(96000);
     //ft.setSamplingRate(214530);
-    // ft.setHighPassFilter(false);
+    //ft.setHighPassFilter(false);
     ft.clear();
 
     // This will buffer at least the number of samples requested into
     // channel buffers. Memory is allocated dynamically and previous
     // data in the buffers will be cleared.
-    ft.buffer(5000);
+    if(local) ft.buffer(5000);
+    else      ft.sendSamples(50000000);
 
 /*
     // Copy samples for channel 1 to array
     int* channel1 = new int[200];
     ft.read(channel1, 200, 1);
 */
-    cout << "Writing buffer to file" << endl;
-    ft.writeBuf2File();
+    if(local){
+        cout << "Writing buffer to file" << endl;
+        ft.writeBuf2File();
+    }
 
     cout << "Clearing channels" << endl;
 
     ft.clear();     // clear to channel buffers to free up memory
 
-    // sendOverSocket();
     return 0;
 }
 
-
-
-//void sendOverSocket(){
-//
-//
-//  int numFiles = 0;
-//  int size;
-//  int bytesRead;
-//  char* buf;
-//  std::stringstream strstream;
-//  string filename;
-//  while(++numFiles < 9){
-//    TCPSocket s("127.0.0.1",0,true);
-//
-//    strstream << "channel" << numFiles << ".csv";
-//    filename = strstream.str();
-//    FILE *fp;
-//    cout << "Opening: " << filename << endl;
-//    fp = fopen(filename.c_str(),"r");
-//    fseek(fp,0L,SEEK_END);
-//    size = ftell(fp);
-//    fseek(fp,0L,SEEK_SET);
-//
-//    buf = (char*) malloc(size);
-//
-//    bytesRead = fread(buf,1,size,fp);
-//
-//    if(bytesRead == 0) exit(1);
-//    if(bytesRead <0){
-//      perror("Read():");
-//      exit(1);
-//    }
-//
-//    s.send(buf,size);
-//    s.close();
-//    strstream.str("");
-//    free(buf);
-//
-//
-//}
-//
-//}
