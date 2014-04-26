@@ -2,8 +2,10 @@
  * 8 Channel Simutaneous ADC Sampling
  *
  * ECE4012: Senior Design, Group: WS2
- * Members: Yao Lu
+ * Members: Yao Lu, Eric Patterson, Austin Ward, Fujun Xie, Mohan Yang
  * Feb 7, 2014
+ *
+ * Author: Yao Lu
  *
  * ft232h.h
  *
@@ -11,8 +13,9 @@
  *
  */
 
-#ifndef __FT232H_H_
-#define __FT232H_H_
+#ifndef __SimulADC_H_
+#define __SimulADC_H_
+
 /*** Standard library headers ***/
 #include <stdlib.h>             // for exit
 #include <iostream>             // std out
@@ -28,7 +31,7 @@
 #include "TCPSocket.h"
 #include "buffer.h"             // managing buffer
 
-#define DEBUG_PRINT             // define this for stdout status
+//#define DEBUG_PRINT             // define this for stdout status
 
 /*** Global constants ***/
 
@@ -43,8 +46,7 @@ const uint32_t BYTES_TO_BUFFER = 250000;
 const uint32_t SPI_WAIT = 10000;
 
 
-
-class FT232H;                   // declare class existance
+class SimulADC;                   // declare class existance
 
 typedef struct{
   uint32_t currentChannel;
@@ -112,12 +114,12 @@ struct CS5368_REGS
 class ACBUS_out
 {
   private:
-    FT232H* ft;                 // associated device
+    SimulADC* ft;                 // associated device
     uint8_t mask_high;          // used for driving high
     uint8_t mask_low;           // used for driving low
     uint8_t value;              // save current state (for toggle)
   public:
-    ACBUS_out(FT232H* ft, uint8_t index);
+    ACBUS_out(SimulADC* ft, uint8_t index);
     /* Sets value, but does not write out to device */
     void set(uint8_t out);
     /* Writes out all CBUS state updates since last write to device */
@@ -133,15 +135,15 @@ class ACBUS_out
  * the specific interface to the CS5368 ADC chip
  *
  */
-class FT232H
+class SimulADC
 {
 
 /*****************************************************************************
  *  User API
  *****************************************************************************/
   public:
-    FT232H();
-    ~FT232H();
+    SimulADC();
+    ~SimulADC();
 
     /* Initiates the ADC to start sampling, goes through a reset cycle */
     void init_ADC();
@@ -153,6 +155,7 @@ class FT232H
      */
     void setSamplingRate(int rate);
 
+    /* True = set high pass filter on (DC offset) */
     void setHighPassFilter(bool on);
 
     /* Specifies number of channels to use */
@@ -170,25 +173,18 @@ class FT232H
     /* Populates given buffer with samples from requested channel */
     void read(int* buf, int samples, int channel);
 
-    /*** Network Functions ***/
-
-    /* TCP or UDP */
-    void setSocketType(std::string type);
-
-    void connect(std::string ip, int port);
-
-    void disconnect();
-
-    void send();
-
-    void sendSamples(int sample_count);
-
     /* Clears all buffers, should be called before reading/sending data */
     void clear();
 
+    /*** Network Functions ***/
+    //void setSocketType(std::string type);     // only TCP is supported
+    void connect(std::string ip, int port);
+    void disconnect();
+    void sendSamples(int sample_count);
+
     /*
-     * Called to program ft232h device,
-     * should be called only once on the first run for each device.
+     * Called to program ft232h device.
+     * Only call once on the first run for each new device.
      *
      * FT1248 mode and settings is set along with ACBUS pins.
      *
@@ -206,12 +202,15 @@ class FT232H
     uint8_t CHIP_ADDRESS;           // ADC SPI address
     CS5368_REGS adc_regs;           // ADC registers
     uint32_t crystal_freq;          // in Hz (set to 27Mhz default)
-    Socket* socket;
-    uint8_t socket_type;            // 1 = TCP, 0 = UDP
+    uint32_t channel_num;           // number of adc channels, 8 default
+
+    // Networking variables
+    Socket* socket;                 // socket connection
+    //uint8_t socket_type;          // only TCP is supported
     std::string ip;
     uint32_t port;
-    uint32_t channel_num;                // number of adc channels, 8 default
     uint32_t socketBuffer[4096];
+
     // Buffer and variables for storing results of each read
     uint8_t RxBuffer[262144];       // FT_Read can handle max of 256k bytes
     DWORD RxBytes;
@@ -259,13 +258,15 @@ class FT232H
     /* Throw away all samples until the next change in LRCK */
     void alignToNextLRCK(uint8_t LRCK, uint8_t limit);
 
+    void send();
+
 
     /*** Supporting functions ***/
 
     /*
      * Writes data to the specified register. Data must first be
      * defined (i.e. adc_regs.MUTE = 0xff). Argument is the
-     * addressed of the entrie register
+     * addressed of the entire register
      * (i.e. write_SPI(&adc_regs.MUTE.all)
      *
      */
@@ -278,31 +279,6 @@ class FT232H
      *
      */
     void errCheck(std::string errString);
-
-
-    /*** Debugging functions ***/
-
-    /* Writes each of the channel buffers out to a separate
-     * file in csv format
-     */
-  public:
-    void writeBuf2File(){
-        std::ofstream file;
-        uint32_t entry;
-        uint32_t n;
-        for(int i = 0; i < 8; i++){
-            std::stringstream filename;
-            filename << "channel" << (i+1) << ".csv";
-            file.open(filename.str().c_str());
-            channelBuffer[i].reset();
-            n = 0;
-            while(channelBuffer[i].getNext(entry)){
-                file << n << "," << entry << std::endl;
-                n++;
-            }
-            file.close();
-        }
-    }
 
   friend class ACBUS_out;       // allow access to status variables
 };
