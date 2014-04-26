@@ -21,10 +21,6 @@
 
 using namespace std;
 
-/* debugging variables */
-uint8_t history[64];
-int count = 0;
-uint8_t pole = 0;
 
 
 
@@ -269,7 +265,7 @@ void FT232H::sendSamples(int sample_count)
         blockingRead(BYTES_TO_BUFFER);
 
         //Format each sample, one at a time, until no more are left
-        while(formatSample()) {count++;}
+        while(formatSample()) {}
         this->send();
         samples_sent += channelBuffer[0].getEntries();
         for(uint32_t i = 0; i < channel_num; ++i){
