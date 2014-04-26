@@ -19,39 +19,42 @@ using namespace std;
 
 int main()
 {
-    bool first_run = false;             // get this as a cmd arg later
+    bool first_run = false;
     bool local = false;
+
+    // Create the adc object
     SimulADC adc;
-    // Configuration parameters
+
+    // Program the usb chip (ft232h) if this is the first run
     if(first_run) adc.programEEPROM();
+
+    // Configuration parameters that can be set before initialization
     adc.setChannelNum(8);
     adc.setCrystalFreq(24576000);
 
-    //if(!local) adc.connect("192.168.1.101",3000);
+    // Connect to destination
     if(!local) adc.connect("127.0.0.1",3000);
 
-    // Initialize ADC and to start sampling
+    // Initialize the ADC
     adc.init_ADC();
 
-    // Setting sampling rate, which must be followed by buffer clear
+    // Configuration parameters that must be set after initialization
     adc.setSamplingRate(96000);
-    //adc.setHighPassFilter(false);
+    //adc.setHighPassFilter(false);             // on by default
+
+    // Must clear buffers before reading or sending data
     adc.clear();
 
-    // This will buffer at least the number of samples requested into
-    // channel buffers. Memory is allocated dynamically and previous
-    // data in the buffers will be cleared.
+    // Buffer samples locally or send them to a remote address
     if(local) adc.buffer(5000);
     else      while(1) adc.sendSamples(500000);
 
-/*
-    // Copy samples for channel 1 to array
-    int* channel1 = new int[200];
-    adc.read(channel1, 200, 1);
-*/
-
-    cout << "Clearing channels" << endl;
-    adc.clear();     // clear to channel buffers to free up memory
+    // Example to read samples locally
+    int* channel1;
+    if(local){
+        channel1 = new int[200];
+        adc.read(channel1, 200, 1);
+    }
 
     return 0;
 }
