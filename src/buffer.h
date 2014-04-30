@@ -1,10 +1,8 @@
 /*
  * 8 Channel Simutaneous ADC Sampling
-
-
  *
  * ECE4012: Senior Design, Group: WS2
- * Members: Yao Lu
+ * Members: Yao Lu, Eric Patterson, Austin Ward, Fujun Xie, Mohan Yang
  * Feb 13, 2014
  *
  * Author: Yao Lu

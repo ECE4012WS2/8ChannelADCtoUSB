@@ -1,0 +1,81 @@
+Library Files:
+
+WinTypes.h
+ftd2xx.h
+libftd2xx.a
+
+Source Files:
+
+simuladc.h
+simuladc.cpp
+Socket.h
+Socket.cpp
+TCPSocket.h
+TCPSocket.cpp
+
+Execute make to compile with static library. Replace with 32-bit library if needed.
+
+
+/********************************************************************************/
+ * SimulADC API
+ ********************************************************************************/
+
+// Initialize ADC, call this before configuring
+void init_ADC();
+
+// Program the PCB hardware, called once on the very first run
+void programEEPROM();
+
+// Set crystal oscillator frequency on the board
+void setCrystalFreq(int freq);
+
+// Set sampling frequency (if invalid, all valid rates will be
+// print as derived from crystal oscillator)
+void setSamplingRate(int rate);
+
+// Control High Pass filter (DC offset, see CS5368 datasheet for details)
+void setHighPassFilter(bool on);
+
+// Number of channels to use, up to 8
+void setChannelNum(int n);
+
+// Local function, clear buffers and acquire the number of samples
+void buffer(int samples);
+
+// Local function, read and clear number of samples from channel
+void read(int* buf, int samples, int channel);
+
+// Local function, clear all buffers
+void clear();
+
+// Network function, connect to remote application
+void connect(std::string ip, int port);
+
+// Network function, disconnect from remote application
+void disconnect();
+
+// Network function, acquire and send the number of samples
+void sendSamples(int sample_count);
+
+/********************************************************************************/
+
+
+Network format is a stream of unsigned 32-bit integers. The first integer is
+the channel number, the second is the number of samples for the channel, followed
+by the samples. This is repeated for each active channel. For example, sending
+three samples with 2 channels active would look like:
+
+channel = 1
+size = 3
+sample 1
+sample 2
+sample 3
+channel = 2
+size = 3
+sample 1
+sample 2
+sample 3
+
+Note: When calling sendSamples(), the size received for the even channels may
+differ by 1 from the odd channels. However, it will be at least the number
+of samples requested.

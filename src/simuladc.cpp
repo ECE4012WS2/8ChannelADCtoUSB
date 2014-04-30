@@ -24,8 +24,10 @@
  * 8 Channel Simutaneous ADC Sampling
  *
  * ECE4012: Senior Design, Group: WS2
- * Members: Yao Lu
+ * Members: Yao Lu, Eric Patterson, Austin Ward, Fujun Xie, Mohan Yang
  * Feb 7, 2014
+ *
+ * Author: Yao Lu
  *
  * ft232h.cpp
  *
@@ -33,18 +35,12 @@
  *
  */
 
-#include "ft232h.h"
+#include "simuladc.h"
 #include <unistd.h>             // usleep
 
-#include "time.h"
 #include <string.h>
 
-//#define TIME_LOG
-
 using namespace std;
-
-
-
 
 /* Table and function used to flip a byte, defined for convenient
  * debugging purposes */
@@ -59,7 +55,7 @@ uint8_t flip( uint8_t n )
 }
 
 /* Constructor, initializes ACBUS pins and initial variables */
-FT232H::FT232H()
+SimulADC::SimulADC()
   : SSn_RST(this, 0),
     CDIN(this, 1),
     CCLK(this, 2),
@@ -68,7 +64,7 @@ FT232H::FT232H()
     ftStatus = 0;
     ftHandle = 0;
     crystal_freq = 27450000;
-    socket_type = 1;
+    //socket_type = 1;
     channel_num = 8;
     RxBytes = 0;
     BytesReceived = 0;
@@ -104,13 +100,13 @@ FT232H::FT232H()
     reset();
 }
 
-FT232H::~FT232H()
+SimulADC::~SimulADC()
 {
-    if(socket) delete socket;
-    close();
+    if(socket) delete socket;           // delete socket connection
+    close();                            // close ft232h
 }
 
-void FT232H::setSamplingRate(int rate)
+void SimulADC::setSamplingRate(int rate)
 {
     double r = (double) rate;
     double mclk = crystal_freq;
@@ -180,7 +176,7 @@ void FT232H::setSamplingRate(int rate)
     write_SPI(&adc_regs.GCTL.all);
 }
 
-void FT232H::setHighPassFilter(bool on)
+void SimulADC::setHighPassFilter(bool on)
 {
     if(on) adc_regs.HPF = 0x00;
     else   adc_regs.HPF = 0xFF;
@@ -193,37 +189,37 @@ void FT232H::setHighPassFilter(bool on)
     write_SPI(&adc_regs.HPF);
 }
 
-void FT232H::setChannelNum(int n)
+void SimulADC::setChannelNum(int n)
 {
     channel_num = (uint32_t) n;
 }
 
-void FT232H::setCrystalFreq(int freq)
+void SimulADC::setCrystalFreq(int freq)
 {
     crystal_freq = (uint32_t) freq;
 }
 
-void FT232H::connect(string ip, int port)
+void SimulADC::connect(string ip, int port)
 {
     if(socket){
         cout << "Error: connection already exists." << endl;
         exit(1);
     }
-    if(socket_type == 1){
+    //if(socket_type == 1){
         socket = new TCPSocket(ip, port, true);
-    }else if(socket_type == 0){
-      cout <<"Error: UDP NOT IMPLEMENTED" << endl;
-      exit(1);
-    }
+    //}else if(socket_type == 0){
+    //  cout <<"Error: UDP NOT IMPLEMENTED" << endl;
+    //  exit(1);
+    //}
 }
 
-void FT232H::disconnect()
+void SimulADC::disconnect()
 {
     delete[] socket;
     socket = NULL;
 }
 
-void FT232H::send(){
+void SimulADC::send(){
       header_t header;
       uint8_t currentChannel = 0;
       uint32_t numEntries;
@@ -248,7 +244,7 @@ void FT232H::send(){
       }
 }
 
-void FT232H::clear()
+void SimulADC::clear()
 {
     // Clear raw data buffer and channel buffers
     dataBuffer.clearN(dataBuffer.getEntries());
@@ -260,7 +256,7 @@ void FT232H::clear()
     purge();
 }
 
-void FT232H::sendSamples(int sample_count)
+void SimulADC::sendSamples(int sample_count)
 {
     // Clear data buffer and allocate space for channel buffers
     dataBuffer.clearN(dataBuffer.getEntries());
@@ -302,7 +298,7 @@ void FT232H::sendSamples(int sample_count)
 #endif
 }
 
-void FT232H::buffer(int sample_count)
+void SimulADC::buffer(int sample_count)
 {
     // Clear data buffer and allocate space for channel buffers
     dataBuffer.clearN(dataBuffer.getEntries());
@@ -336,7 +332,7 @@ void FT232H::buffer(int sample_count)
     while(formatSample()) {}
 }
 
-void FT232H::read(int* buf, int samples, int channel)
+void SimulADC::read(int* buf, int samples, int channel)
 {
     // Check that channel exists
     if((uint32_t)channel > channel_num && channel < 1){
@@ -355,7 +351,8 @@ void FT232H::read(int* buf, int samples, int channel)
     channelBuffer[channel-1].clearN(samples);
 }
 
-void FT232H::setSocketType(std::string type)
+/*
+void SimulADC::setSocketType(std::string type)
 {
     if(!type.compare("UDP")){
         socket_type = 0;
@@ -367,8 +364,9 @@ void FT232H::setSocketType(std::string type)
         exit(1);
     }
 }
+*/
 
-void FT232H::init_ADC()
+void SimulADC::init_ADC()
 {
 
 #ifdef DEBUG_PRINT
@@ -413,7 +411,7 @@ void FT232H::init_ADC()
     CSn_CL = 1;             //
 }
 
-void FT232H::open()
+void SimulADC::open()
 {
 	long locIdBuf[16];
 	for(int i = 0; i < 16; i++) locIdBuf[i] = -1;
@@ -429,7 +427,7 @@ void FT232H::open()
 	}
 }
 
-void FT232H::open(uint16_t port)
+void SimulADC::open(uint16_t port)
 {
 
 #ifdef DEBUG_PRINT
@@ -440,7 +438,7 @@ void FT232H::open(uint16_t port)
     errCheck("FT_Open failed");
 }
 
-void FT232H::reset()
+void SimulADC::reset()
 {
 
 #ifdef DEBUG_PRINT
@@ -455,7 +453,7 @@ void FT232H::reset()
     errCheck("FT_SetTimeouts");
 }
 
-void FT232H::purge()
+void SimulADC::purge()
 {
 
 #ifdef DEBUG_PRINT
@@ -467,7 +465,7 @@ void FT232H::purge()
     errCheck("FT_Purge failed");
 }
 
-void FT232H::close()
+void SimulADC::close()
 {
 
 #ifdef DEBUG_PRINT
@@ -478,7 +476,7 @@ void FT232H::close()
     errCheck("FT_Close failed");
 }
 
-void FT232H::readBuffer()
+void SimulADC::readBuffer()
 {
 
 #ifdef TIME_LOG
@@ -513,7 +511,7 @@ void FT232H::readBuffer()
     }
 }
 
-DWORD FT232H::blockingRead(DWORD bytes)
+DWORD SimulADC::blockingRead(DWORD bytes)
 {
 #ifdef TIME_LOG
     struct timespec start, end;
@@ -537,7 +535,7 @@ DWORD FT232H::blockingRead(DWORD bytes)
     return BytesReceived;
 }
 
-bool FT232H::formatSample()
+bool SimulADC::formatSample()
 {
     // Make sure enough data is in buffer
     if(dataBuffer.getEntries() < 50) return false;
@@ -545,13 +543,13 @@ bool FT232H::formatSample()
 // Save next 64 entries for debugging in case over 32 clocks seen for one sample
 //dataBuffer.getN(history, 64);
 
-    uint8_t entry;
+    uint8_t entry = 0;
     // Peek into first entry for the LRCK bit, which is high in LJ mode
     // when the channel is odd
     dataBuffer.getN(&entry, 1);
     uint8_t LRCK = entry & 1;
 
-    uint32_t i0, i1, i2, i3;
+    uint32_t i0=0, i1=0, i2=0, i3=0;
     // Add a new entry for the even or odd channels, depending on LRCK
     // and how many channels needed
     if(channel_num >= (uint32_t)(2-LRCK)) i0 = channelBuffer[1-LRCK].add(0);
@@ -584,7 +582,7 @@ bool FT232H::formatSample()
 /* Aligns buffer to the next set of channels different from the given LRCK.
  * If no valid LRCK (0 or 1) is given, the LRCK of the first entry in the
  * buffer is used */
-void FT232H::alignToNextLRCK(uint8_t LRCK, uint8_t limit)
+void SimulADC::alignToNextLRCK(uint8_t LRCK, uint8_t limit)
 {
     uint8_t entry;
     int i = 0;
@@ -599,7 +597,7 @@ void FT232H::alignToNextLRCK(uint8_t LRCK, uint8_t limit)
     }
 }
 
-void FT232H::write_SPI(uint8_t* reg)
+void SimulADC::write_SPI(uint8_t* reg)
 {
     uint32_t clock_wait = 10000;        // clock change wait time
     uint8_t map = *(reg-1);             // get register address
@@ -652,7 +650,7 @@ void FT232H::write_SPI(uint8_t* reg)
     }
 }
 
-void FT232H::programEEPROM()
+void SimulADC::programEEPROM()
 {
 
 #ifdef DEBUG_PRINT
@@ -711,7 +709,7 @@ void FT232H::programEEPROM()
     errCheck("programEE");
 }
 
-void FT232H::errCheck(string errString)
+void SimulADC::errCheck(string errString)
 {
     switch(ftStatus){
         case FT_OK:
@@ -770,7 +768,7 @@ void FT232H::errCheck(string errString)
     exit(1);
 }
 
-ACBUS_out::ACBUS_out(FT232H* ft, uint8_t index)
+ACBUS_out::ACBUS_out(SimulADC* ft, uint8_t index)
 {
     this->ft = ft;                  // save associated device
     mask_high = 1 << index;         // set bit mask used for driving high
@@ -801,3 +799,4 @@ uint8_t ACBUS_out::operator!() const
 {
     return !value;
 }
+
