@@ -29,10 +29,10 @@ int main()
     ft.setCrystalFreq(24576000);
     //ft.setCrystalFreq(27460000);
     //ft.setSocketType("TCP");
-    
+
 
     //if(!local) ft.connect("192.168.1.101",3000);
-    if(!local) ft.connect("127.0.0.1",3000);
+    if(!local) ft.connect("192.168.1.103",3000);
 
     // Initialize ADC and to start sampling
     ft.init_ADC();
@@ -46,8 +46,9 @@ int main()
     // This will buffer at least the number of samples requested into
     // channel buffers. Memory is allocated dynamically and previous
     // data in the buffers will be cleared.
+	cout << "Sending data" << endl;
     if(local) ft.buffer(5000);
-    else      ft.sendSamples(50000000);
+    else      while(true){ft.sendSamples(50000000);}
 
 /*
     // Copy samples for channel 1 to array
@@ -65,4 +66,3 @@ int main()
 
     return 0;
 }
-

@@ -28,7 +28,7 @@
 #include "TCPSocket.h"
 #include "buffer.h"             // managing buffer
 
-#define DEBUG_PRINT             // define this for stdout status
+//#define DEBUG_PRINT             // define this for stdout status
 
 /*** Global constants ***/
 

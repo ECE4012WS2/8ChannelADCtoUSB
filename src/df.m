@@ -6,7 +6,9 @@
 %
 %  Test inputs
 %
-
+clear
+clc
+close all
 scrsz = get(0,'ScreenSize');
 hfig = figure;
 set(hfig,'position',scrsz);
@@ -14,7 +16,8 @@ set(hfig,'position',scrsz);
 
 
 t = tcpip('0.0.0.0',3000,'NetworkRole','server','Terminator','');
-set(t,'InputBufferSize',120000);
+inputBufferSize = 12000000;
+set(t,'InputBufferSize',inputBufferSize);
 
 disp('Waiting for connection');
 fopen(t);
@@ -25,6 +28,9 @@ while true
     while (length(signal1) < 2^16) || (length(signal2) < 2^16) %.5 seconds of data
         channel = fread(t,1,'uint32');         % channel number
         arraySize = fread(t,1,'uint32');           % sample count
+        if(arraySize >= inputBufferSize/4 || arraySize <= 0);
+            continue
+        end
         data = fread(t,arraySize,'uint32');     % sample data
         numSamples = numSamples + arraySize;
         if(channel == 1)
@@ -40,9 +46,9 @@ while true
     baseline = 1.5;		% [meter]
     
     if(length(signal1) < length(signal2))
-        signal2 = signal2(1:end-1);
+        signal2 = signal2(1:length(signal1));
     else if length(signal2) < length(signal1)
-            signal1 = signal1(1:end-1);
+            signal1 = signal1(1:length(signal2));
         end
     end
     
@@ -88,6 +94,15 @@ while true
     
     % 1 Using FFT Techniques
     %
+    
+    if(length(sig1AC) < length(sig2AC))
+        sig2AC = sig2AC(1:length(sig1AC));
+    else if(length(sig2AC) < length(sig1AC))
+        sig1AC = sig1AC(1:length(sig2AC));
+        end
+    end
+    
+    
     lags12 = real( ifft( fft(sig1AC) .* conj( fft(sig2AC) ) ) );
     
     lags12zeroindex = fix(length(lags12)/2);   % Put Zero delay in middle of plot
@@ -103,13 +118,13 @@ while true
     %
     
     
-    subplot(4,1,1)
-    plot(sig1AC);
-    title('Signal1 AC Coupled');
-    xlabel('[Samples]');
-    subplot(4,1,2)
-    plot(sig2AC);
-    title('Signal2 AC Coupled');
+%     subplot(4,1,1)
+%     plot(sig1AC);
+%     title('Signal1 AC Coupled');
+%     xlabel('[Samples]');
+%     subplot(4,1,2)
+%     plot(sig2AC);
+%     title('Signal2 AC Coupled');
     %xlabel('[Samples]');
     
     %subplot(6,1,3);
@@ -123,17 +138,17 @@ while true
     %xlabel('lags');
     
     
-    subplot(4,1,3)
-    plot(1000* 1000* tautau, lags12( (lags12zeroindex-samplemax):(lags12zeroindex+samplemax) ) );
-    title('XCorr(1,2)');
-    xlabel('[uSec]');
+%     subplot(4,1,3)
+%     plot(1000* 1000* tautau, lags12( (lags12zeroindex-samplemax):(lags12zeroindex+samplemax) ) );
+%     title('XCorr(1,2)');
+%     xlabel('[uSec]');
     
     angleindex = 180/pi*asin(tautau * c / baseline);
     
-    subplot(4,1,4)
-    plot(angleindex, lags12( (lags12zeroindex-samplemax):(lags12zeroindex+samplemax) ) );
-    title('XCorr(1,2)');
-    xlabel('[Degrees]');
+%     subplot(4,1,4)
+%     plot(angleindex, lags12( (lags12zeroindex-samplemax):(lags12zeroindex+samplemax) ) );
+%     title('XCorr(1,2)');
+%     xlabel('[Degrees]');
     
     
     % Polar Plot
@@ -149,7 +164,7 @@ while true
     
     % This is the best estimate of the Angle-of-Arrival
     %
-    angle = angleindex(maxIndex)	% Estimate of Angle-of-Arrival [Degrees]
+    angle = angleindex(maxIndex);	% Estimate of Angle-of-Arrival [Degrees]
     drawnow;
     % Note that maxValue will provide a quality-of-service with bigger values indicating a better estimate for amplitude normalized input signals
     
