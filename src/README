@@ -31,6 +31,9 @@ void setCrystalFreq(int freq);
 
 // Set sampling frequency (if invalid, all valid rates will be
 // print as derived from crystal oscillator)
+// 
+// Note: don't call this to set the rate to the maximum rate,
+// which is already default and it seems to create problems
 void setSamplingRate(int rate);
 
 // Control High Pass filter (DC offset, see CS5368 datasheet for details)
